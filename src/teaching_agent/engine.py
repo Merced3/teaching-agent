@@ -27,6 +27,18 @@ _COMMANDS = [
     {"name": "recall", "description": "Run any recall checks that are due, right now."},
     {"name": "close", "description": "Close the session: update the knowledge base and commit."},
     {"name": "status", "description": "Where am I? Current state and next milestone, briefly."},
+    {
+        "name": "mode",
+        "description": "Switch test mode: test = never write to the knowledge base.",
+        "options": [
+            {
+                "name": "setting",
+                "description": "test or live",
+                "type": "string",
+                "required": True,
+            }
+        ],
+    },
 ]
 
 _COMMAND_PROMPTS = {
@@ -57,7 +69,7 @@ _RECALL_TICK_PROMPT = (
 )
 
 
-def build_system_prompt(settings: Settings) -> str:
+def build_system_prompt(settings: Settings, *, test_mode: bool) -> str:
     """The teacher's standing orders: the handoff protocol plus channel context."""
     handoff_path = settings.knowledge_root / "docs" / "session-handoff.md"
     handoff = handoff_path.read_text(encoding="utf-8") if handoff_path.is_file() else ""
@@ -77,7 +89,7 @@ def build_system_prompt(settings: Settings) -> str:
         "Never include internal notes in it.",
         "- Git-commit knowledge-base changes at session close.",
     ]
-    if settings.test_mode:
+    if test_mode:
         parts.append(
             "",
             "TEST MODE IS ON: never write to docs/, maps/, sessions/, or lessons/. "
@@ -94,6 +106,7 @@ class TeachingEngine:
         self._settings = settings
         self._hub = hub
         self._pi = pi
+        self._test_mode = settings.test_mode
 
     async def start(self) -> None:
         """Claim the channel and declare commands. Idempotent across restarts."""
@@ -142,14 +155,19 @@ class TeachingEngine:
     async def _handle_command(self, payload: dict[str, Any]) -> bool:
         """Kick off command handling; True means the caller should defer."""
         command = str(payload.get("command") or "")
-        prompt = _COMMAND_PROMPTS.get(command)
         interaction_id = str(payload.get("interaction_id") or "")
         user = payload.get("user") or {}
-        if prompt is None or not interaction_id:
+        if not interaction_id:
             return False
         if str(user.get("id")) != str(self._settings.discord_allowed_user_id):
             await self._hub.post_followup(interaction_id, "Not your tutor.", ephemeral=True)
             return True
+        if command == "mode":
+            await self._handle_mode(payload)
+            return True
+        prompt = _COMMAND_PROMPTS.get(command)
+        if prompt is None:
+            return False
 
         channel_id = int(payload.get("channel_id"))
 
@@ -161,6 +179,34 @@ class TeachingEngine:
 
         asyncio.create_task(run())
         return True
+
+    async def _handle_mode(self, payload: dict[str, Any]) -> None:
+        """Flip test mode live: rebuild pi's system prompt and restart the
+        subprocess (the RPC client resumes the same session file, so the
+        conversation survives). Operational toggle — code-owned, not a prompt."""
+        interaction_id = str(payload.get("interaction_id"))
+        setting = str((payload.get("options") or {}).get("setting") or "").strip().lower()
+        if setting not in {"test", "live"}:
+            await self._hub.post_followup(
+                interaction_id, "Usage: /mode test or /mode live", ephemeral=True
+            )
+            return
+        want_test = setting == "test"
+        if want_test == self._test_mode:
+            await self._hub.post_followup(
+                interaction_id, f"Already in {setting} mode.", ephemeral=True
+            )
+            return
+        self._test_mode = want_test
+        self._pi.system_prompt = build_system_prompt(self._settings, test_mode=want_test)
+        await self._pi.close()
+        logger.info("Test mode toggled: %s", want_test)
+        note = (
+            "TEST MODE ON — I won't write to the knowledge base."
+            if want_test
+            else "LIVE MODE — session close will write to the knowledge base and commit."
+        )
+        await self._hub.post_followup(interaction_id, note, ephemeral=False)
 
     async def recall_tick(self) -> None:
         """Scheduled job: let Pi decide whether a recall check is due."""

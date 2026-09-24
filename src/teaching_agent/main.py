@@ -29,7 +29,7 @@ def build_engine(settings: Settings) -> TeachingEngine:
         session_directory=settings.pi_session_directory,
         session_name=settings.agent_name.lower().replace(" ", "-"),
         model=settings.pi_model,
-        system_prompt=build_system_prompt(settings),
+        system_prompt=build_system_prompt(settings, test_mode=settings.test_mode),
         timeout_seconds=settings.pi_timeout_seconds,
     )
     return TeachingEngine(settings, hub, pi)

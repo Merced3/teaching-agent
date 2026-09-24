@@ -232,3 +232,15 @@ Intervention: Created docs/integrations/ (README defining the type; discord-hub.
 Evidence: learner requested the doc type ("nothing is needed currently, all needs met" framing is his). ADR-vs-log: one format serves both experiment and architecture entries so far; discord-hub's ADRs exist because it makes protocol decisions with consumers — this project's decisions are mostly self-contained.
 
 Verdict: keep. Voice code remains blocked on the hub's streaming-audio contract (documented as the blocking item in docs/integrations/discord-hub.md §2); Phase B implementation resumes when the hub ships it.
+
+---
+
+## 2026-09-22 — /mode command: test mode flippable from Discord
+
+Hypothesis: Operational toggles (test/live) belong in code as commands, not as prompts to pi — mode is a safety boundary, and a safety boundary must not depend on model cooperation. Pedagogy stays prompt-owned; operations stay code-owned. (Principle transferable to socratic-partner.)
+
+Intervention: Added /mode test|live slash command. Toggling rebuilds pi's system prompt and restarts the subprocess; the RPC client resumes the same session file, so conversation continuity survives. Restricted to the allowed user; bad values rejected without side effects.
+
+Evidence: 3 new black-box tests (toggle restarts pi with rebuilt prompt, bad value rejected, stranger rejected); 11/11 green, ruff clean.
+
+Verdict: keep.

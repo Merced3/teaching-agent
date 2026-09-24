@@ -34,6 +34,6 @@ cp .env.example .env                    # fill in your values
 python -m teaching_agent.main
 ```
 
-`TEACHING_AGENT_TEST_MODE=true` (the default) means the teacher never writes to the knowledge base. Flip to `false` for real sessions. Unprompted recall pings are off by default (project spine); enable via `TEACHING_AGENT_RECALL_PINGS_ENABLED`.
+`TEACHING_AGENT_TEST_MODE=true` (the default) means the teacher never writes to the knowledge base. Flip live from Discord with `/mode test` / `/mode live` (restarts the pi subprocess with a rebuilt system prompt; the conversation session resumes). Unprompted recall pings are off by default (project spine); enable via `TEACHING_AGENT_RECALL_PINGS_ENABLED`.
 
 Everything except `AGENTS.md` is a current best theory and may be rewritten — with the change logged in `docs/decision-log.md`.
