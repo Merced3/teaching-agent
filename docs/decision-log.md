@@ -220,3 +220,15 @@ Intervention: Renamed repo learning-library → teaching-agent (name describes w
 Evidence: 8 black-box tests pass; ruff clean. Not yet run live against the real hub/Discord — first live run is the next gate.
 
 Verdict: keep, pending live verification. Owed: first end-to-end run (register #learning, send a message, run /status), then decide whether the single-persistent-pi-session model holds or threads need per-thread pi sessions.
+
+---
+
+## 2026-09-22 — Integration contracts doc type + identity + deployment notes; ADR question answered
+
+Hypothesis: (a) A dedicated doc type — one file per dependency, stating this project's needs agnostically, with explicit "all needs met" when silent — communicates across sessions better than ad-hoc messages. (b) The existing decision-log format (hypothesis → evidence → verdict) suffices for architecture decisions too; ADRs would be a second format to maintain before a demonstrated need.
+
+Intervention: Created docs/integrations/ (README defining the type; discord-hub.md with open requests incl. multi-client verification; automation-harness.md at "all needs met"). Chose identity: display name "Alvar" (the Alvar method, thesis H2) + committed avatar, both .env values. Wrote docs/deployment.md for the future VPS session. Kept the decision log as the single decision record; ADR adoption deferred until decisions start needing "superseded-by" chains.
+
+Evidence: learner requested the doc type ("nothing is needed currently, all needs met" framing is his). ADR-vs-log: one format serves both experiment and architecture entries so far; discord-hub's ADRs exist because it makes protocol decisions with consumers — this project's decisions are mostly self-contained.
+
+Verdict: keep. Voice code remains blocked on the hub's streaming-audio contract (documented as the blocking item in docs/integrations/discord-hub.md §2); Phase B implementation resumes when the hub ships it.
