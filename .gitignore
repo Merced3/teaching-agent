@@ -9,5 +9,10 @@ lessons/**/*.mp3
 Thumbs.db
 .DS_Store
 
-# Python cache
+# Python cache / environments
 __pycache__/
+.venv/
+*.egg-info/
+
+# Runtime data (pi sessions, harness state, logs)
+data/

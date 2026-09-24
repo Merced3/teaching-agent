@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "teaching-agent"
+version = "0.1.0"
+description = "A personal teaching agent: probe, teach, verify, re-verify. Discord via discord-hub; thinking via pi RPC; knowledge in markdown."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.27,<1",
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.30,<1",
+  "python-dotenv>=1.0,<2",
+  "automation-harness",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8,<9",
+  "pytest-asyncio>=0.24,<1",
+  "ruff>=0.9,<1",
+]
+
+[project.scripts]
+teaching-agent = "teaching_agent.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/teaching_agent"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+exclude = ["lessons", "tools"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
