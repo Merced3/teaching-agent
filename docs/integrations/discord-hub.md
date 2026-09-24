@@ -1,9 +1,12 @@
-# Requests for discord-hub (from consuming projects)
+# Needs from discord-hub
+
+**Status: open requests exist (voice, history export, deletion, multi-client
+verification). The text surface is fully met.**
 
 Hand this file to a discord-hub session. Every request is written agnostically:
-the hub serves any project; no teaching-agent or socratic-partner concept
-appears in the contracts. Reasons and example consumers are given so the hub
-session can judge the design, not just the ask.
+the hub serves any project; no consuming project's vocabulary appears in the
+contracts. Reasons and example consumers are given so the hub session can
+judge the design, not just the ask.
 
 Principle the hub already follows, restated for alignment: the hub owns the
 Discord connection and Discord primitives. Projects own their own databases,
@@ -23,6 +26,12 @@ notifications) needs exactly this. Consumer: teaching-agent (voice lessons).
 Potential consumer: socratic-partner (spoken dialogues).
 
 ## 2. Bidirectional streaming audio (design the transport for this from the start)
+
+**This is the one contract a consuming project is blocked on.** The consumer's
+voice pipeline (speech-to-text → model → text-to-speech, all swappable layers)
+is designed and ready to build the moment this transport exists. Utterance-sized
+consumption is the first use; the same stream must not preclude a future
+real-time speech-to-speech bridge.
 
 Join/leave/play covers outbound audio. Inbound (hearing the user) should be
 designed as a **stream**, not as "record a segment, POST a file":
@@ -84,6 +93,23 @@ a session is. Consumers: socratic-partner (requested), teaching-agent
 (same pattern), any future project with per-thread state.
 
 ---
+
+## 6. Multi-client verification (test request, not a feature)
+
+The hub has never been verified serving TWO projects at once. Before a second
+consumer goes live against the same hub, verify and, where broken, fix:
+
+- Two projects registered on two different channels simultaneously; inbound
+  messages route only to the owning project's callback.
+- Each project's outbound messages keep their own webhook identity (name/avatar).
+- Slash command namespacing: two projects declaring commands (distinct names)
+  both work; a name collision returns 409 to the loser, not silent misrouting.
+- Threads created by project A in A's channel never deliver to project B.
+- One project's callback being down does not delay or drop the other's deliveries.
+
+**Reason:** the hub's whole thesis is "one bot, every project talks through
+it." That thesis is currently tested at n=1. Consumer: any second project —
+imminently, since socratic-partner and this project will run side by side.
 
 ## Already exists, no work needed
 
