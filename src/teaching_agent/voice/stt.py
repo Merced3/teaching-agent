@@ -55,7 +55,7 @@ class DeepgramSTT(STTProvider):
     _URL = (
         "wss://api.deepgram.com/v1/listen"
         "?model=nova-3&encoding=linear16&sample_rate=16000&channels=1"
-        "&interim_results=true&endpointing=300&smart_format=true&vad_events=true"
+        "&interim_results=true&endpointing=900&smart_format=true&vad_events=true"
     )
 
     _KEEPALIVE_SECONDS = 8.0  # Deepgram 1011s the socket after ~10 s without data

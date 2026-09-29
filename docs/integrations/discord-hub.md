@@ -100,7 +100,31 @@ a session is. Consumers: socratic-partner (requested), teaching-agent
 
 ---
 
+## 5b. Voice join must recover from a lingering Discord voice client (live evidence 2026-09-29)
+
+Observed: after an abnormal disconnect, `POST /voice/join` returned **500
+("Already connected to a voice channel")** and the bot stayed visibly stuck
+in the channel while `GET /voice/status` reported `connected: false`. The
+hub's session tracking thought there was no connection, but the underlying
+discord.py guild voice client was still alive. Only a hub restart
+recovered. Request: on join, if the session is missing/stale but a guild
+voice client lingers, adopt-or-disconnect it instead of 500ing; ideally
+also reconcile on voice-gateway disconnect events. Until then, consumers
+cannot self-heal from this state (`/voice/leave` 404s because the hub
+believes there is no connection).
+
+Related operational note: inbound DAVE decryption currently depends on an
+unmerged upstream PR (discord-ext-voice-recv #58) plus a drop-frame guard,
+both installed at venv level only — a pip upgrade silently reverts them.
+Landing that properly belongs in a discord-hub session.
+
 ## 6. Multi-client verification (test request, not a feature)
+
+**Update 2026-09-29: first collision already happened** — this project
+declared `/status`, which socratic-partner owns; the hub correctly 409'd
+(the contract held; the consuming project renamed to `/progress`). The
+remaining items below (routing isolation, webhook identity, callback
+outages) are still unverified.
 
 The hub has never been verified serving TWO projects at once. Before a second
 consumer goes live against the same hub, verify and, where broken, fix:
