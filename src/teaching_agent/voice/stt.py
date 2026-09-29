@@ -58,14 +58,24 @@ class DeepgramSTT(STTProvider):
         "&interim_results=true&endpointing=300&smart_format=true&vad_events=true"
     )
 
+    _KEEPALIVE_SECONDS = 8.0  # Deepgram 1011s the socket after ~10 s without data
+
     def __init__(self, api_key: str, *, model: str = "nova-3") -> None:
         super().__init__()
         self._api_key = api_key
         self._url = self._URL.replace("model=nova-3", f"model={model}")
         self._ws: websockets.ClientConnection | None = None
         self._reader: asyncio.Task[None] | None = None
+        self._keepalive: asyncio.Task[None] | None = None
+        self._stopped = False
 
     async def start(self) -> None:
+        self._stopped = False
+        await self._connect()
+        self._reader = asyncio.create_task(self._read_loop(), name="deepgram-reader")
+        self._keepalive = asyncio.create_task(self._keepalive_loop(), name="deepgram-keepalive")
+
+    async def _connect(self) -> None:
         try:
             self._ws = await websockets.connect(
                 self._url,
@@ -74,8 +84,20 @@ class DeepgramSTT(STTProvider):
             )
         except Exception as exc:
             raise STTError(f"Deepgram connection failed: {exc}") from exc
-        self._reader = asyncio.create_task(self._read_loop(), name="deepgram-reader")
-        logger.info("Deepgram STT session started.")
+        logger.info("Deepgram STT session connected.")
+
+    async def _keepalive_loop(self) -> None:
+        """Voice sessions are quiet by nature; keep the socket alive through
+        stretches where nobody is speaking."""
+        try:
+            while True:
+                await asyncio.sleep(self._KEEPALIVE_SECONDS)
+                ws = self._ws
+                if ws is not None:
+                    with contextlib.suppress(Exception):
+                        await ws.send(json.dumps({"type": "KeepAlive"}))
+        except asyncio.CancelledError:
+            raise
 
     def feed(self, pcm_mono_16k: bytes) -> None:
         ws = self._ws
@@ -85,9 +107,12 @@ class DeepgramSTT(STTProvider):
             asyncio.get_running_loop().create_task(ws.send(pcm_mono_16k))
 
     async def stop(self) -> None:
-        if self._reader is not None:
-            self._reader.cancel()
-            self._reader = None
+        self._stopped = True
+        for task in (self._reader, self._keepalive):
+            if task is not None:
+                task.cancel()
+        self._reader = None
+        self._keepalive = None
         if self._ws is not None:
             try:
                 await self._ws.send(json.dumps({"type": "CloseStream"}))
@@ -97,33 +122,42 @@ class DeepgramSTT(STTProvider):
             self._ws = None
 
     async def _read_loop(self) -> None:
-        assert self._ws is not None
         current: list[str] = []
-        try:
-            async for raw in self._ws:
-                message = json.loads(raw)
-                if message.get("type") != "Results":
-                    continue
-                channel = message.get("channel") or {}
-                alternatives = channel.get("alternatives") or []
-                transcript = str(alternatives[0].get("transcript", "")) if alternatives else ""
-                if not transcript:
-                    continue
-                if message.get("is_final"):
-                    current.append(transcript)
-                if message.get("speech_final"):
-                    utterance = " ".join(current).strip()
-                    current = []
-                    if utterance:
-                        self.on_utterance(utterance)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception("Deepgram reader died.")
-        finally:
-            remainder = " ".join(current).strip()
-            if remainder:
-                self.on_utterance(remainder)
+        while not self._stopped:
+            try:
+                if self._ws is None:
+                    await self._connect()
+                current = await self._consume(current)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Deepgram connection lost; reconnecting.")
+                self._ws = None
+                if not self._stopped:
+                    await asyncio.sleep(1.0)
+        remainder = " ".join(current).strip()
+        if remainder:
+            self.on_utterance(remainder)
+
+    async def _consume(self, current: list[str]) -> list[str]:
+        assert self._ws is not None
+        async for raw in self._ws:
+            message = json.loads(raw)
+            if message.get("type") != "Results":
+                continue
+            channel = message.get("channel") or {}
+            alternatives = channel.get("alternatives") or []
+            transcript = str(alternatives[0].get("transcript", "")) if alternatives else ""
+            if not transcript:
+                continue
+            if message.get("is_final"):
+                current.append(transcript)
+            if message.get("speech_final"):
+                utterance = " ".join(current).strip()
+                current = []
+                if utterance:
+                    self.on_utterance(utterance)
+        return current
 
 
 STT_PROVIDERS: dict[str, Callable[..., STTProvider]] = {

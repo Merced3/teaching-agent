@@ -27,7 +27,13 @@ _SILENT = "SILENT"
 _COMMANDS = [
     {"name": "recall", "description": "Run any recall checks that are due, right now."},
     {"name": "close", "description": "Close the session: update the knowledge base and commit."},
-    {"name": "status", "description": "Where am I? Current state and next milestone, briefly."},
+    {
+        # Named /progress, not /status: command names are unique across ALL
+        # projects on the hub, and socratic-partner owns "status" (2026-09-30
+        # collision, first live multi-client evidence for integrations §6).
+        "name": "progress",
+        "description": "Where am I? Current state and next milestone, briefly.",
+    },
     {
         "name": "mode",
         "description": "Switch test mode: test = never write to the knowledge base.",
@@ -73,8 +79,8 @@ _COMMAND_PROMPTS = {
         "changed, record the next owed recall check, write a session log under "
         "sessions/, then commit the changes to git. Confirm briefly what you wrote."
     ),
-    "status": (
-        "The learner ran /status. In under 10 sentences: the loop's purpose, my "
+    "progress": (
+        "The learner ran /progress. In under 10 sentences: the loop's purpose, my "
         "current known state, and the next milestone, per docs/current-state.md and "
         "the most recent session logs. Check the real date and flag anything stale."
     ),

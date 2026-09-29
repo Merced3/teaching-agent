@@ -153,8 +153,10 @@ class VoiceConversation:
                 if event.get("type") == "audio":
                     pcm = base64.b64decode(event["pcm"])
                     self._stt.feed(stereo_48k_to_mono_16k(pcm))
-                elif event.get("type") == "speaking" and event.get("state") == "started":
-                    self._interrupt()
+                elif event.get("type") == "speaking":
+                    logger.debug("learner speaking %s", event.get("state"))
+                    if event.get("state") == "started":
+                        self._interrupt()
         except asyncio.CancelledError:
             raise
         except Exception:
