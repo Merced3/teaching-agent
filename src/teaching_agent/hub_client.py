@@ -70,6 +70,7 @@ class HubClient:
         *,
         display_name: str | None = None,
         avatar_url: str | None = None,
+        voice_events: bool = False,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "channel_id": channel_id,
@@ -79,6 +80,8 @@ class HubClient:
             payload["display_name"] = display_name
         if avatar_url is not None:
             payload["avatar_url"] = avatar_url
+        if voice_events:
+            payload["voice_events"] = True
         return await self._request("POST", "/registrations", json=payload)
 
     async def put_commands(
@@ -101,6 +104,17 @@ class HubClient:
             f"/interactions/{interaction_id}/followups",
             json={"text": text, "ephemeral": ephemeral},
         )
+
+    async def voice_status(self) -> dict[str, Any]:
+        return await self._request("GET", "/voice/status")
+
+    async def voice_join(self, channel_id: int, owner: str) -> dict[str, Any]:
+        return await self._request(
+            "POST", "/voice/join", json={"channel_id": channel_id, "owner": owner}
+        )
+
+    async def voice_leave(self, owner: str) -> None:
+        await self._request("POST", "/voice/leave", json={"owner": owner})
 
     async def typing(self, channel_id: int) -> None:
         await self._request("POST", f"/channels/{channel_id}/typing")

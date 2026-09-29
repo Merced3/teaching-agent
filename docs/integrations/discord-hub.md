@@ -1,7 +1,13 @@
 # Needs from discord-hub
 
-**Status: open requests exist (voice, history export, deletion, multi-client
-verification). The text surface is fully met.**
+**Status (2026-09-30): requests 1–3 (voice foundation, bidirectional
+streaming, speaking events) are MET — shipped in the hub's ADR 0005 Stage 2
+and live-verified 2026-09-29; consumed by this project's `voice/` package.
+Open requests remain: history export, deletion primitives, multi-client
+verification.**
+
+The text below is the original ask, kept as the record of what was needed
+and why.
 
 Hand this file to a discord-hub session. Every request is written agnostically:
 the hub serves any project; no consuming project's vocabulary appears in the

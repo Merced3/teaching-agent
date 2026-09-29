@@ -17,6 +17,7 @@ from .config import Settings
 from .engine import TeachingEngine, build_system_prompt
 from .hub_client import HubClient
 from .pi_rpc import PiRpcClient
+from .voice.runtime import VoiceRuntime
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,21 @@ def build_engine(settings: Settings) -> TeachingEngine:
         system_prompt=build_system_prompt(settings, test_mode=settings.test_mode),
         timeout_seconds=settings.pi_timeout_seconds,
     )
-    return TeachingEngine(settings, hub, pi)
+    engine = TeachingEngine(settings, hub, pi)
+    if settings.voice_enabled:
+        engine.set_voice(
+            VoiceRuntime(
+                settings,
+                hub,
+                ask_pi=engine.ask_pi,
+                post_transcript=(
+                    engine.post_voice_transcript
+                    if settings.voice_post_transcript
+                    else None
+                ),
+            )
+        )
+    return engine
 
 
 async def agent_service(ctx: ServiceContext) -> None:

@@ -174,6 +174,18 @@ class PiRpcClient:
         response = await self._request({"type": "get_state"})
         return _response_data(response)
 
+    async def set_model(self, model: str) -> None:
+        """Switch the model on the live process (pi RPC ``set_model``).
+        Accepts the same 'provider/model-id' strings as --model."""
+        provider, separator, model_id = model.partition("/")
+        if not separator or not model_id:
+            raise PiRpcError(f"Model must be 'provider/model-id', got: {model!r}")
+        response = await self._request(
+            {"type": "set_model", "provider": provider, "modelId": model_id}
+        )
+        _response_data(response)
+        self.model = model
+
     async def new_session(self) -> dict[str, Any]:
         async with self._run_lock:
             await self.start()

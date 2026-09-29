@@ -34,6 +34,8 @@ cp .env.example .env                    # fill in your values
 python -m teaching_agent.main
 ```
 
+**Voice (2026-09-30):** full-duplex conversation over discord-hub's `/voice/stream` — Deepgram STT (ears) → the same pi session as text (brain) → ElevenLabs TTS (voice), with barge-in: start talking and the agent stops instantly. Auto-joins whatever voice channel you enter. Every layer is swappable live from Discord: `/voice action:stt|tts value:<name>`, `/voice action:voice value:<voice-id>` (a Jarvis sound is a voice-id, not code), `/voice action:model value:<provider/model-id>`. Requires `DEEPGRAM_API_KEY` + `ELEVENLABS_API_KEY`; see `.env.example`.
+
 `TEACHING_AGENT_TEST_MODE=true` (the default) means the teacher never writes to the knowledge base. Flip live from Discord with `/mode test` / `/mode live` (restarts the pi subprocess with a rebuilt system prompt; the conversation session resumes). Unprompted recall pings are off by default (project spine); enable via `TEACHING_AGENT_RECALL_PINGS_ENABLED`.
 
 Everything except `AGENTS.md` is a current best theory and may be rewritten — with the change logged in `docs/decision-log.md`.

@@ -40,6 +40,15 @@ class Settings:
     pi_timeout_seconds: int
     recall_pings_enabled: bool
     recall_check_interval_seconds: int
+    voice_enabled: bool
+    voice_autojoin: bool
+    voice_stt_provider: str
+    voice_tts_provider: str
+    voice_tts_voice_id: str
+    voice_tts_model_id: str
+    voice_post_transcript: bool
+    deepgram_api_key: str
+    elevenlabs_api_key: str
 
     @classmethod
     def from_environment(
@@ -86,6 +95,29 @@ class Settings:
         recall_check_interval_seconds = _positive_int_with_default(
             environment, "TEACHING_AGENT_RECALL_CHECK_INTERVAL_SECONDS", default=3600
         )
+        voice_enabled = _parse_bool(environment.get("TEACHING_AGENT_VOICE_ENABLED", "false"))
+        voice_autojoin = _parse_bool(
+            environment.get("TEACHING_AGENT_VOICE_AUTOJOIN", "true")
+        )
+        voice_stt_provider = environment.get("TEACHING_AGENT_VOICE_STT", "deepgram").strip()
+        voice_tts_provider = environment.get("TEACHING_AGENT_VOICE_TTS", "elevenlabs").strip()
+        voice_tts_voice_id = environment.get("TEACHING_AGENT_VOICE_TTS_VOICE_ID", "").strip()
+        voice_tts_model_id = environment.get(
+            "TEACHING_AGENT_VOICE_TTS_MODEL", "eleven_turbo_v2_5"
+        ).strip()
+        voice_post_transcript = _parse_bool(
+            environment.get("TEACHING_AGENT_VOICE_POST_TRANSCRIPT", "true")
+        )
+        deepgram_api_key = environment.get("DEEPGRAM_API_KEY", "").strip()
+        elevenlabs_api_key = environment.get("ELEVENLABS_API_KEY", "").strip()
+        if voice_enabled and not deepgram_api_key:
+            raise ConfigurationError("DEEPGRAM_API_KEY is required when voice is enabled.")
+        if voice_enabled and not elevenlabs_api_key:
+            raise ConfigurationError("ELEVENLABS_API_KEY is required when voice is enabled.")
+        if voice_enabled and not voice_tts_voice_id:
+            raise ConfigurationError(
+                "TEACHING_AGENT_VOICE_TTS_VOICE_ID is required when voice is enabled."
+            )
 
         if log_level not in _VALID_LOG_LEVELS:
             raise ConfigurationError(
@@ -114,6 +146,15 @@ class Settings:
             pi_timeout_seconds=pi_timeout_seconds,
             recall_pings_enabled=recall_pings_enabled,
             recall_check_interval_seconds=recall_check_interval_seconds,
+            voice_enabled=voice_enabled,
+            voice_autojoin=voice_autojoin,
+            voice_stt_provider=voice_stt_provider,
+            voice_tts_provider=voice_tts_provider,
+            voice_tts_voice_id=voice_tts_voice_id,
+            voice_tts_model_id=voice_tts_model_id,
+            voice_post_transcript=voice_post_transcript,
+            deepgram_api_key=deepgram_api_key,
+            elevenlabs_api_key=elevenlabs_api_key,
         )
 
 

@@ -244,3 +244,10 @@ Intervention: Added /mode test|live slash command. Toggling rebuilds pi's system
 Evidence: 3 new black-box tests (toggle restarts pi with rebuilt prompt, bad value rejected, stranger rejected); 11/11 green, ruff clean.
 
 Verdict: keep.
+## 2026-09-30 — Voice: full-duplex conversation layer
+
+- **Hypothesis:** the hub's Stage-2 duplex stream (per-speaker PCM + speaking events) is enough transport for a walk-and-talk teaching conversation with real interruption; STT/TTS/model stay swappable layers on this project's side, per the integration ask.
+- **What was built:** `src/teaching_agent/voice/` — Deepgram streaming STT (endpointing = utterance boundaries) → same pi session as text (spoken-turn wrapper) → ElevenLabs streaming TTS, paced ~300 ms ahead of playback so barge-in (hub `speaking started` → cancel turn) leaves almost nothing buffered. Auto-join via `voice_events` registration; `/voice` command swaps ears/voice/voice-id/model live. Spoken exchanges post 🎙 transcripts to the text channel (configurable).
+- **Decisions:** (1) brain = the same pi session, not a parallel fast LLM — teaching continuity beats latency for a teacher; (2) interruption policy lives here, hub events are transport signals only; (3) resampling is naive decimate/duplicate — no filter state, inaudible at speech quality; (4) a latent crash in `build_system_prompt` (append vs extend, test-mode branch) was found and fixed — the runtime had never actually booted live.
+- **Evidence:** 17 tests green; build smoke-tested. NOT yet evidence: first live conversation, blocked on DEEPGRAM_API_KEY + ELEVENLABS_API_KEY.
+- **Verdict:** pending live run — the 2026-09-03 prosody hypothesis becomes testable then.

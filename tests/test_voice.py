@@ -1,0 +1,101 @@
+"""Black-box tests for the voice boundary: PCM wire conversions, who the
+agent follows into voice, and what the /voice command guards. Turn
+mechanics (barge-in, pacing) need a live hub — verified by ear, not here."""
+
+from __future__ import annotations
+
+from unittest.mock import AsyncMock
+
+import numpy as np
+
+from teaching_agent.config import Settings
+from teaching_agent.engine import TeachingEngine
+from teaching_agent.voice.pcm import mono_24k_to_stereo_48k, stereo_48k_to_mono_16k
+
+ENV = {
+    "DISCORD_CHANNEL_ID": "100",
+    "DISCORD_ALLOWED_USER_ID": "42",
+    "TEACHING_AGENT_VOICE_ENABLED": "true",
+    "DEEPGRAM_API_KEY": "x",
+    "ELEVENLABS_API_KEY": "y",
+    "TEACHING_AGENT_VOICE_TTS_VOICE_ID": "z",
+}
+
+
+def make_engine() -> tuple[TeachingEngine, AsyncMock, AsyncMock, AsyncMock]:
+    settings = Settings.from_environment(ENV, env_file=None)
+    hub, pi, voice = AsyncMock(), AsyncMock(), AsyncMock()
+    return TeachingEngine(settings, hub, pi, voice=voice), hub, pi, voice
+
+
+# -- PCM wire conversions ---------------------------------------------------
+
+
+def test_hub_frame_downmixes_and_decimates() -> None:
+    # One second of constant signal, s16le 48 kHz stereo.
+    samples = np.full(48000 * 2, 1000, dtype=np.int16)
+    out = stereo_48k_to_mono_16k(samples.tobytes())
+    result = np.frombuffer(out, dtype=np.int16)
+    assert result.size == 16000
+    assert np.all(np.abs(result - 1000) <= 1)
+
+
+def test_tts_chunk_upsamples_to_hub_format() -> None:
+    samples = np.arange(2400, dtype=np.int16)  # 100 ms of 24 kHz mono
+    out = mono_24k_to_stereo_48k(samples.tobytes())
+    result = np.frombuffer(out, dtype=np.int16)
+    assert result.size == 2400 * 4  # 2x upsample, 2 channels
+    assert result[0] == result[1] == result[2] == result[3] == 0
+    assert result[4] == 1  # each source sample repeated 4x
+
+
+# -- voice_state routing ------------------------------------------------------
+
+
+async def test_follows_the_learner_into_voice() -> None:
+    engine, hub, _, voice = make_engine()
+    await engine.dispatch(
+        {"type": "voice_state", "user": {"id": "42"}, "after_channel_id": "555"}
+    )
+    voice.join.assert_awaited_once_with(555)
+
+
+async def test_ignores_other_users_voice_events() -> None:
+    engine, hub, _, voice = make_engine()
+    await engine.dispatch(
+        {"type": "voice_state", "user": {"id": "999"}, "after_channel_id": "555"}
+    )
+    voice.join.assert_not_awaited()
+
+
+async def test_leaves_when_the_learner_leaves() -> None:
+    engine, hub, _, voice = make_engine()
+    voice.is_active = True
+    await engine.dispatch(
+        {"type": "voice_state", "user": {"id": "42"}, "after_channel_id": None}
+    )
+    voice.leave.assert_awaited_once()
+
+
+# -- /voice command guards ----------------------------------------------------
+
+
+async def test_voice_model_failure_is_reported_not_raised() -> None:
+    from teaching_agent.pi_rpc import PiRpcError
+
+    engine, hub, pi, _ = make_engine()
+    pi.set_model.side_effect = PiRpcError("Model must be 'provider/model-id'")
+    result = await engine.dispatch(
+        {
+            "type": "command",
+            "command": "voice",
+            "interaction_id": "i1",
+            "user": {"id": "42"},
+            "channel_id": "100",
+            "options": {"action": "model", "value": "not-a-model"},
+        }
+    )
+    assert result == {"defer": True, "ephemeral": False}
+    hub.post_followup.assert_awaited_once()
+    args = hub.post_followup.call_args
+    assert "Voice command failed" in args.args[1]
