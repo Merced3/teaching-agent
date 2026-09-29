@@ -16,3 +16,6 @@ __pycache__/
 
 # Runtime data (pi sessions, harness state, logs)
 data/
+
+# local voice test samples
+voice-test*.wav
