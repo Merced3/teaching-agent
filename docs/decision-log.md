@@ -271,3 +271,9 @@ Verdict: keep.
 - **Evidence:** 22 tests green (5 new: finalize routing, filler timing, missing-dir no-op). NOT yet evidence: live PTT conversation; filler clips not yet generated — ElevenLabs quota exhausted (0 credits, likely the 22MB thesis mp3). Per the autonomy rule, no retry until the learner intervenes; re-run `python tools/make_filler_audio.py` after quota reset/upgrade.
 - **Verdict:** built, awaiting live test with Discord push-to-talk enabled.
 - **Parked:** join greeting ("At your service.") hook in `join()` — one shot TTS on session start, deferred until turn-taking is verified live.
+## 2026-10-01 — Turn-taking fix: hold-the-floor accumulation (live test 1 failure)
+
+- **Evidence (live):** first PTT test failed exactly at the predicted seam — Deepgram endpointing (900ms) fired mid-hold during a thinking pause; "Why is the sky / blue?" split into two turns and the agent replied while the learner still held Caps Lock. The finalize-on-release half worked; nothing gated turns *during* the hold.
+- **Fix:** turns no longer fire from STT utterances at all. `_on_utterance` only accumulates fragments; the turn fires on the hub's `speaking stopped` + 0.8s grace (final transcript fragment landing). `speaking started` re-holds (cancels a pending flush) and still barge-in interrupts. The speaking key is now the one true turn boundary; endpointing is demoted to text segmentation. Provider-agnostic: policy in conversation.py, hub events stay transport signals.
+- **Evidence:** 25 tests green (2 new: merge-and-fire-on-release, re-press-during-grace cancels). NOT yet evidence: live retest.
+- **Verdict:** built, awaiting live test 1 retry.

@@ -216,3 +216,55 @@ async def test_missing_filler_dir_is_silent_noop(tmp_path) -> None:
     reply = await conversation._ask_with_fillers(conversation._generation, "hello")
     assert reply == "reply"
     assert not ws.sent
+
+
+async def test_utterances_merge_and_fire_only_after_speaking_stops(monkeypatch) -> None:
+    """The PTT hold is the floor: mid-hold endpointing fragments must not
+    fire turns; release + grace fires one merged turn."""
+    monkeypatch.setattr(conv, "_FLUSH_GRACE_SECONDS", 0.02)
+    fired: list[str] = []
+
+    async def ask_pi(text: str) -> str:
+        fired.append(text)
+        return "reply"
+
+    conversation, stt, _ = make_conversation(
+        [
+            {"type": "speaking", "user_id": "42", "state": "started"},
+            {"type": "speaking", "user_id": "42", "state": "stopped"},
+        ],
+        ask_pi=ask_pi,
+    )
+    # Learner holds the key; Deepgram endpoints mid-hold (the bug).
+    conversation._learner_speaking = True
+    conversation._on_utterance("Why is the sky")
+    await asyncio.sleep(0.05)
+    assert fired == []  # nothing fired while holding
+    # Release: speaking stopped -> finalize + grace -> merged turn.
+    conversation._learner_speaking = False
+    conversation._on_utterance("blue?")
+    conversation._schedule_flush()
+    await asyncio.sleep(0.1)
+    assert len(fired) == 1
+    assert "Why is the sky blue?" in fired[0]
+
+
+async def test_speaking_again_during_grace_cancels_flush(monkeypatch) -> None:
+    """VAD flap / re-press inside the grace window must not fire the turn."""
+    monkeypatch.setattr(conv, "_FLUSH_GRACE_SECONDS", 0.05)
+    fired: list[str] = []
+
+    async def ask_pi(text: str) -> str:
+        fired.append(text)
+        return "reply"
+
+    conversation, _, _ = make_conversation([], ask_pi=ask_pi)
+    conversation._on_utterance("wait I")
+    conversation._schedule_flush()
+    await asyncio.sleep(0.02)  # inside the grace window
+    conversation._learner_speaking = True
+    conversation._cancel_flush()  # what speaking-started does
+    conversation._on_utterance("meant to ask more")
+    await asyncio.sleep(0.1)
+    assert fired == []
+    assert conversation._pending_utterances == ["wait I", "meant to ask more"]

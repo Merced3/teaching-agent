@@ -44,6 +44,8 @@ PostTranscript = Callable[[str, str], Awaitable[None]]
 
 _FILLER_DELAY_SECONDS = 2.0  # pi silence this long -> first "Mm."
 _FILLER_INTERVAL_SECONDS = 3.0  # then repeat (rotating clips) until pi answers
+_FLUSH_GRACE_SECONDS = 0.8  # after speaking stops, wait this long for the
+# final transcript fragment before firing the merged turn
 
 _VOICE_TURN_TEMPLATE = (
     "[voice session — spoken turn] The learner said (speech-to-text): {text}\n"
@@ -83,6 +85,9 @@ class VoiceConversation:
         self._ws: websockets.ClientConnection | None = None
         self._reader_task: asyncio.Task[None] | None = None
         self._turn_task: asyncio.Task[None] | None = None
+        self._flush_task: asyncio.Task[None] | None = None
+        self._learner_speaking = False
+        self._pending_utterances: list[str] = []
         self._generation = 0
         self.channel_id: int | None = None
 
@@ -126,6 +131,8 @@ class VoiceConversation:
 
     async def leave(self) -> None:
         self._interrupt()
+        self._cancel_flush()
+        self._pending_utterances.clear()
         if self._reader_task is not None:
             self._reader_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -163,12 +170,16 @@ class VoiceConversation:
                 elif event.get("type") == "speaking":
                     logger.debug("learner speaking %s", event.get("state"))
                     if event.get("state") == "started":
+                        self._learner_speaking = True
+                        self._cancel_flush()  # still talking; hold the turn
                         self._interrupt()
                     elif event.get("state") == "stopped":
-                        # With push-to-talk, the key release IS the turn
-                        # boundary — no silence-guessing. Flush the STT so
-                        # the utterance fires now. Harmless without PTT.
+                        # The speaking key/mic release IS the turn boundary.
+                        # Flush the STT so the last fragment lands, then
+                        # fire the merged turn after a short grace.
+                        self._learner_speaking = False
                         self._stt.finalize()
+                        self._schedule_flush()
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -183,7 +194,38 @@ class VoiceConversation:
             logger.info("Turn interrupted by learner speech.")
 
     def _on_utterance(self, text: str) -> None:
+        """STT drew a fragment boundary. Never fire a turn straight from
+        this — while the learner holds the floor (PTT key down / VAD
+        active), fragments just accumulate. The turn belongs to the
+        speaking-stopped signal, not to a silence timer."""
         if not self.is_active:
+            return
+        self._pending_utterances.append(text)
+        if not self._learner_speaking:
+            self._schedule_flush()
+
+    def _cancel_flush(self) -> None:
+        if self._flush_task is not None and not self._flush_task.done():
+            self._flush_task.cancel()
+        self._flush_task = None
+
+    def _schedule_flush(self) -> None:
+        self._cancel_flush()
+        if self.is_active:
+            self._flush_task = asyncio.create_task(
+                self._flush_after_grace(), name="voice-flush"
+            )
+
+    async def _flush_after_grace(self) -> None:
+        try:
+            await asyncio.sleep(_FLUSH_GRACE_SECONDS)
+        except asyncio.CancelledError:
+            raise
+        if self._learner_speaking or not self._pending_utterances:
+            return
+        text = " ".join(self._pending_utterances).strip()
+        self._pending_utterances.clear()
+        if not text:
             return
         self._generation += 1
         if self._turn_task is not None and not self._turn_task.done():
