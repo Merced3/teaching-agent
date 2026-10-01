@@ -17,6 +17,7 @@ from .config import Settings
 from .engine import TeachingEngine, build_system_prompt
 from .hub_client import HubClient
 from .pi_rpc import PiRpcClient
+from .voice.ptt import RemotePTT
 from .voice.runtime import VoiceRuntime
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,8 @@ def build_engine(settings: Settings) -> TeachingEngine:
     )
     engine = TeachingEngine(settings, hub, pi)
     if settings.voice_enabled:
+        remote_ptt = RemotePTT()
+        engine.remote_ptt = remote_ptt
         engine.set_voice(
             VoiceRuntime(
                 settings,
@@ -45,6 +48,7 @@ def build_engine(settings: Settings) -> TeachingEngine:
                     if settings.voice_post_transcript
                     else None
                 ),
+                remote_ptt=remote_ptt,
             )
         )
     return engine
@@ -57,7 +61,11 @@ async def agent_service(ctx: ServiceContext) -> None:
     engine = build_engine(settings)
     await engine.start()
 
-    app = create_callback_app(engine.dispatch)
+    app = create_callback_app(
+        engine.dispatch,
+        remote_ptt=getattr(engine, "remote_ptt", None),
+        ptt_token=settings.voice_ptt_token,
+    )
     server = uvicorn.Server(
         uvicorn.Config(
             app,

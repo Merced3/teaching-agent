@@ -277,3 +277,11 @@ Verdict: keep.
 - **Fix:** turns no longer fire from STT utterances at all. `_on_utterance` only accumulates fragments; the turn fires on the hub's `speaking stopped` + 0.8s grace (final transcript fragment landing). `speaking started` re-holds (cancels a pending flush) and still barge-in interrupts. The speaking key is now the one true turn boundary; endpointing is demoted to text segmentation. Provider-agnostic: policy in conversation.py, hub events stay transport signals.
 - **Evidence:** 25 tests green (2 new: merge-and-fire-on-release, re-press-during-grace cancels). NOT yet evidence: live retest.
 - **Verdict:** built, awaiting live test 1 retry.
+## 2026-10-01 (late) — Dual-mode turn boundary: remote PTT + auto fallback
+
+- **Evidence (live retest):** turn fired during a thinking pause even with Caps Lock held — Discord's client VADs transmitted audio, so hub speaking events are audio-activity guesses, NOT key state. Discord exposes no PTT key state to bots (privacy/bandwidth, confirmed by learner's own research). The "Discord PTT = exact button" premise is dead; logged as replaced, not erased.
+- **What was built:** pluggable turn-boundary source. `voice/ptt.py` RemotePTT (heartbeat = presence; press/release callbacks) shared between the callback server and the conversation. Callback server gains `GET /ptt` (phone hold-to-talk page, token in URL) + `POST /voice/ptt` (down/up) + heartbeat route, token-gated via TEACHING_AGENT_VOICE_PTT_TOKEN. MANUAL mode (heartbeat fresh): press = hold floor + interrupt, release = finalize + flush — zero tuned seconds. AUTO mode (heartbeat lapsed): previous speaking-event + grace behavior. Hub speaking events are ignored as boundaries while manual.
+- **Rejected:** public tunnel (attack surface for nothing); VPS relay deferred — deployment.md already parks VPS hosting, which will serve the page directly when it happens. Tailscale is the off-LAN answer meanwhile.
+- **Evidence:** 31 tests green (heartbeat mode-switching, press/release semantics, manual hold/fire, hub events ignored in manual, route auth). NOT yet evidence: live phone-button conversation.
+- **Verdict:** built, awaiting live test on LAN; Tailscale setup is the learner's off-LAN step.
+- **Parked:** BLE physical button listener (same /voice/ptt endpoint, new client) — only if the phone page proves out and physical is wanted.

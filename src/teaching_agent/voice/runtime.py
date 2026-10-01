@@ -14,6 +14,7 @@ from typing import Any
 
 from ..config import Settings
 from .conversation import AskPi, PostTranscript, VoiceConversation
+from .ptt import RemotePTT
 from .stt import STT_PROVIDERS, DeepgramSTT, STTProvider
 from .tts import TTS_PROVIDERS, ElevenLabsTTS, TTSProvider
 
@@ -31,6 +32,7 @@ class VoiceRuntime:
         hub: Any,
         ask_pi: AskPi,
         post_transcript: PostTranscript | None = None,
+        remote_ptt: RemotePTT | None = None,
     ) -> None:
         self._settings = settings
         self._hub = hub
@@ -43,6 +45,7 @@ class VoiceRuntime:
         self._stt_name = settings.voice_stt_provider
         self._tts_name = settings.voice_tts_provider
         self._voice_id = settings.voice_tts_voice_id
+        self._remote_ptt = remote_ptt
         self._conversation: VoiceConversation | None = None
 
     # -- introspection ------------------------------------------------------
@@ -82,6 +85,7 @@ class VoiceRuntime:
                 ask_pi=self._ask_pi,
                 post_transcript=self._post_transcript,
                 filler_dir=self._settings.voice_filler_dir,
+                remote_ptt=self._remote_ptt,
             )
         await self._conversation.join(channel_id)
 

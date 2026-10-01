@@ -30,6 +30,7 @@ from typing import Any
 import websockets
 
 from .pcm import stereo_48k_to_mono_16k
+from .ptt import RemotePTT
 from .stt import STTProvider
 from .tts import TTSProvider
 
@@ -70,6 +71,7 @@ class VoiceConversation:
         ask_pi: AskPi,
         post_transcript: PostTranscript | None = None,
         filler_dir: Path | None = None,
+        remote_ptt: RemotePTT | None = None,
     ) -> None:
         self._hub = hub
         self._hub_ws_url = hub_ws_url
@@ -81,6 +83,7 @@ class VoiceConversation:
         self._post_transcript = post_transcript
         self._filler_dir = filler_dir
         self._filler_clips: list[bytes] | None = None  # lazy: loaded on first use
+        self._remote_ptt = remote_ptt
 
         self._ws: websockets.ClientConnection | None = None
         self._reader_task: asyncio.Task[None] | None = None
@@ -109,6 +112,24 @@ class VoiceConversation:
 
     # -- lifecycle ----------------------------------------------------------
 
+    def _manual_mode(self) -> bool:
+        """A fresh remote heartbeat means the button is in hand: turn
+        boundaries come from press/release exactly, and hub speaking
+        events (audio-VAD guesses) stop being boundary signals."""
+        return self._remote_ptt is not None and self._remote_ptt.connected
+
+    def _remote_press(self) -> None:
+        logger.info("Remote PTT pressed — holding the floor.")
+        self._learner_speaking = True
+        self._cancel_flush()
+        self._interrupt()
+
+    def _remote_release(self) -> None:
+        logger.info("Remote PTT released — turn over.")
+        self._learner_speaking = False
+        self._stt.finalize()
+        self._schedule_flush()
+
     @property
     def is_active(self) -> bool:
         return self._ws is not None
@@ -120,6 +141,12 @@ class VoiceConversation:
             await self.leave()
         await self._hub.voice_join(channel_id, self._owner)
         self.channel_id = channel_id
+        if self._remote_ptt is not None:
+            self._remote_ptt.on_press = self._remote_press
+            self._remote_ptt.on_release = self._remote_release
+        if self._remote_ptt is not None:
+            self._remote_ptt.on_press = self._remote_press
+            self._remote_ptt.on_release = self._remote_release
         self._ws = await websockets.connect(
             f"{self._hub_ws_url}/voice/stream?owner={self._owner}",
             max_size=8 * 1024 * 1024,
@@ -169,6 +196,10 @@ class VoiceConversation:
                     self._stt.feed(stereo_48k_to_mono_16k(pcm))
                 elif event.get("type") == "speaking":
                     logger.info("learner speaking %s", event.get("state"))
+                    if self._manual_mode():
+                        # Button present: audio-VAD events are noise for
+                        # boundary purposes; press/release owns the floor.
+                        continue
                     if event.get("state") == "started":
                         self._learner_speaking = True
                         self._cancel_flush()  # still talking; hold the turn

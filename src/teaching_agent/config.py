@@ -49,6 +49,7 @@ class Settings:
     voice_tts_model_id: str
     voice_post_transcript: bool
     voice_filler_dir: Path
+    voice_ptt_token: str
     deepgram_api_key: str
     elevenlabs_api_key: str
 
@@ -117,6 +118,7 @@ class Settings:
             environment.get("TEACHING_AGENT_VOICE_FILLER_DIR", "out/fillers").strip()
             or "out/fillers"
         )
+        voice_ptt_token = environment.get("TEACHING_AGENT_VOICE_PTT_TOKEN", "").strip()
         deepgram_api_key = environment.get("DEEPGRAM_API_KEY", "").strip()
         elevenlabs_api_key = environment.get("ELEVENLABS_API_KEY", "").strip()
         if voice_enabled and not deepgram_api_key:
@@ -164,6 +166,7 @@ class Settings:
             voice_tts_model_id=voice_tts_model_id,
             voice_post_transcript=voice_post_transcript,
             voice_filler_dir=voice_filler_dir,
+            voice_ptt_token=voice_ptt_token,
             deepgram_api_key=deepgram_api_key,
             elevenlabs_api_key=elevenlabs_api_key,
         )

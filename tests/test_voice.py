@@ -268,3 +268,86 @@ async def test_speaking_again_during_grace_cancels_flush(monkeypatch) -> None:
     await asyncio.sleep(0.1)
     assert fired == []
     assert conversation._pending_utterances == ["wait I", "meant to ask more"]
+
+
+# -- remote PTT: dual-mode turn boundary --------------------------------------
+
+from teaching_agent.voice.ptt import RemotePTT
+
+
+def test_remote_ptt_mode_follows_heartbeat_freshness() -> None:
+    ptt = RemotePTT(heartbeat_timeout_seconds=0.05)
+    assert not ptt.connected
+    ptt.heartbeat()
+    assert ptt.connected
+    import time
+    time.sleep(0.08)
+    assert not ptt.connected  # lapsed heartbeat -> back to AUTO
+
+
+def test_remote_ptt_press_release_events() -> None:
+    ptt = RemotePTT()
+    events: list[str] = []
+    ptt.on_press = lambda: events.append("press")
+    ptt.on_release = lambda: events.append("release")
+    ptt.press()
+    ptt.press()  # held: no double-fire
+    ptt.release()
+    ptt.release()  # not held: no spurious release
+    assert events == ["press", "release"]
+
+
+async def test_manual_mode_press_holds_release_fires(monkeypatch) -> None:
+    monkeypatch.setattr(conv, "_FLUSH_GRACE_SECONDS", 0.02)
+    fired: list[str] = []
+
+    async def ask_pi(text: str) -> str:
+        fired.append(text)
+        return "reply"
+
+    ptt = RemotePTT()
+    conversation, stt, _ = make_conversation([], ask_pi=ask_pi)
+    conversation._remote_ptt = ptt
+    ptt.on_press = conversation._remote_press
+    ptt.on_release = conversation._remote_release
+
+    ptt.heartbeat()  # button in hand -> MANUAL mode
+    ptt.press()
+    conversation._on_utterance("Why is the sky")
+    await asyncio.sleep(0.05)
+    assert fired == []  # held floor: fragment accumulated, nothing fired
+    ptt.release()
+    await asyncio.sleep(0.1)
+    assert len(fired) == 1 and "Why is the sky" in fired[0]
+    assert stt.finalized == 1
+
+
+async def test_hub_speaking_events_ignored_in_manual_mode() -> None:
+    ptt = RemotePTT()
+    ptt.heartbeat()
+    conversation, stt, _ = make_conversation(
+        [{"type": "speaking", "user_id": "42", "state": "stopped"}]
+    )
+    conversation._remote_ptt = ptt
+    await conversation._read_loop()
+    assert stt.finalized == 0  # audio-VAD noise did not act as a boundary
+
+
+async def test_ptt_routes_and_auth() -> None:
+    from httpx import ASGITransport, AsyncClient
+
+    from teaching_agent.callback_server import create_callback_app
+
+    ptt = RemotePTT()
+    app = create_callback_app(AsyncMock(return_value=None), remote_ptt=ptt, ptt_token="s3cret")
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as client:
+        bad = await client.post("/voice/ptt", json={"state": "down", "token": "wrong"})
+        assert bad.status_code == 403 and not ptt.pressed
+        down = await client.post("/voice/ptt", json={"state": "down", "token": "s3cret"})
+        assert down.status_code == 204 and ptt.pressed
+        up = await client.post("/voice/ptt", json={"state": "up", "token": "s3cret"})
+        assert up.status_code == 204 and not ptt.pressed
+        hb = await client.post("/voice/ptt/heartbeat", json={"token": "s3cret"})
+        assert hb.status_code == 204 and ptt.connected
+        page = await client.get("/ptt")
+        assert page.status_code == 200 and "Hold to talk" in page.text
