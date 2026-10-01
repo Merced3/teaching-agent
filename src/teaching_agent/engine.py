@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from typing import Any
 
 from .config import Settings
@@ -188,6 +189,20 @@ class TeachingEngine:
             return None
 
         thread = payload.get("thread") or {}
+        if (
+            self._settings.text_require_address
+            and not thread.get("name")  # a thread IS the conversation; no gate
+            and not re.search(
+                rf"\b{re.escape(self._settings.agent_name)}\b", text, re.IGNORECASE
+            )
+        ):
+            # The channel doubles as the learner's notepad (and voice
+            # transcripts post here); only messages that address the agent
+            # by name are conversation. ("Alvar" is a display name, not a
+            # mentionable Discord account, so we match the word.)
+            logger.info("Ignored unaddressed message: %.60s", text)
+            return None
+
         channel_id = int(thread.get("id") or payload.get("channel_id"))
         prompt = f"[thread: {thread['name']}] {text}" if thread.get("name") else text
 

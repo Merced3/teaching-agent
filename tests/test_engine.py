@@ -14,6 +14,7 @@ from teaching_agent.pi_rpc import PiRunResult
 ENV = {
     "DISCORD_CHANNEL_ID": "100",
     "DISCORD_ALLOWED_USER_ID": "42",
+    "TEACHING_AGENT_NAME": "Alvar",
 }
 
 
@@ -40,9 +41,26 @@ def message(text: str, author_id: str = "42", **extra: Any) -> dict[str, Any]:
 
 async def test_learner_message_is_answered_in_channel() -> None:
     engine, hub, pi = await _started()
-    await engine.dispatch(message("teach me"))
-    pi.prompt.assert_awaited_once_with("teach me")
+    await engine.dispatch(message("Alvar, teach me"))
+    pi.prompt.assert_awaited_once_with("Alvar, teach me")
     hub.post_message.assert_awaited_once_with(100, "reply")
+
+
+async def test_unaddressed_message_is_ignored() -> None:
+    """The channel doubles as a notepad; only name-addressed messages reply."""
+    engine, hub, pi = await _started()
+    await engine.dispatch(message("next up is test 2"))
+    pi.prompt.assert_not_awaited()
+    hub.post_message.assert_not_awaited()
+
+
+async def test_addressing_is_case_insensitive_word_match() -> None:
+    engine, hub, pi = await _started()
+    await engine.dispatch(message("hey alvar what do you think?"))
+    pi.prompt.assert_awaited_once()
+    pi.prompt.reset_mock()
+    await engine.dispatch(message("Alvarado is a different word"))
+    pi.prompt.assert_not_awaited()
 
 
 async def test_strangers_are_ignored() -> None:

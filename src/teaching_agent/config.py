@@ -39,6 +39,7 @@ class Settings:
     pi_model: str | None
     pi_timeout_seconds: int
     recall_pings_enabled: bool
+    text_require_address: bool
     recall_check_interval_seconds: int
     voice_enabled: bool
     voice_autojoin: bool
@@ -92,6 +93,9 @@ class Settings:
         )
         recall_pings_enabled = _parse_bool(
             environment.get("TEACHING_AGENT_RECALL_PINGS_ENABLED", "false")
+        )
+        text_require_address = _parse_bool(
+            environment.get("TEACHING_AGENT_TEXT_REQUIRE_ADDRESS", "true")
         )
         recall_check_interval_seconds = _positive_int_with_default(
             environment, "TEACHING_AGENT_RECALL_CHECK_INTERVAL_SECONDS", default=3600
@@ -150,6 +154,7 @@ class Settings:
             pi_model=pi_model,
             pi_timeout_seconds=pi_timeout_seconds,
             recall_pings_enabled=recall_pings_enabled,
+            text_require_address=text_require_address,
             recall_check_interval_seconds=recall_check_interval_seconds,
             voice_enabled=voice_enabled,
             voice_autojoin=voice_autojoin,
