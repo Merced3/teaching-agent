@@ -19,3 +19,6 @@ data/
 
 # local voice test samples
 voice-test*.wav
+
+# Generated audio output (thesis reads, filler clips — reproducible via tools/)
+out/
