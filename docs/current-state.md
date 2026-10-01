@@ -1,6 +1,6 @@
 # Current State
 
-Last updated: 2026-09-30 (turn-taking pass: PTT-driven turn boundaries via STT `finalize()` + pre-generated "Mm." thinking fillers; 22 tests green, awaiting live PTT test).
+Last updated: 2026-10-01 night (turn-taking suite built: PTT finalize, hold-the-floor accumulation, "Mm." fillers, text gating, dual-mode remote PTT + phone /ptt page — 31 tests green, NONE live-verified: hub DAVE receive broke (RTP padding, root-caused, partial venv patch, residual opus `invalid argument`) — see decision-log 2026-10-01 night and the boundary note below).
 
 ## What exists
 
@@ -20,6 +20,8 @@ Last updated: 2026-09-30 (turn-taking pass: PTT-driven turn boundaries via STT `
 Deep-dive complete (2026-09-18). Next session: recall checks ~2026-09-21 (3-day interval): (1) keyed-receipt trick — 3rd attempt, switch to PRODUCTION rep (write the handler pseudocode cold, not verbal recall); (2) invariant / enforcement-at-write-boundary names; (3) idempotent-vs-retry-safe distinction; (4) crash-window general form (between 2 durable steps; duplication-vs-loss is chosen). Also owed: node-5 applied-grade via one no-scaffold transfer in a new domain (email send / CI deploy) — fold into the 09-21 checks. Then a learner decision: pick the next deep-dive from the map's remaining edge nodes, or consolidate with a small project using all five nodes. Retention pattern re-confirmed 2026-09-18: mechanisms stick, lookup details (keyed receipt's target) fade fastest — keyed receipt has faded twice at short intervals.
 
 ## Known risks / open decisions
+
+- **NEXT SESSION START HERE (2026-10-01 night):** the night's full state is in decision-log "2026-10-01 (night)". Summary: (1) All teaching-agent voice work is committed/green but unverified end-to-end. (2) The blocker is discord-hub's receive path — a discord-hub session must land the RTP-padding fix properly and chase the residual opus `invalid argument` decode failure; hub venv currently holds 3 local patches (fork + drop-guard + padding strip) and davey 0.1.4. A boundary rule was bent to get this far — don't repeat it from this side. (3) Once receive works: rerun voice Tests 1–4 (auto count, fillers, barge-in, phone-button manual mode). (4) Setup notes: Discord must be Voice Activity (the /ptt button is a turn boundary, NOT a mic gate); callback host 0.0.0.0 + TEACHING_AGENT_VOICE_PTT_TOKEN for the phone page; Tailscale for off-LAN; ElevenLabs Creator sub active; filler clips generated in out/fillers/ (gitignored).
 
 - Repo renamed `learning-library` → `teaching-agent` (2026-09-22): the name describes what runs. If the knowledge base ever splits into its own repo, that repo reclaims `learning-library`.
 - Multi-client hub operation (two projects, one hub) is unverified — test before running alongside socratic-partner (see `docs/integrations/discord-hub.md` §6).
