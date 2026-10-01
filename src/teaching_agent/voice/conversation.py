@@ -168,7 +168,7 @@ class VoiceConversation:
                     pcm = base64.b64decode(event["pcm"])
                     self._stt.feed(stereo_48k_to_mono_16k(pcm))
                 elif event.get("type") == "speaking":
-                    logger.debug("learner speaking %s", event.get("state"))
+                    logger.info("learner speaking %s", event.get("state"))
                     if event.get("state") == "started":
                         self._learner_speaking = True
                         self._cancel_flush()  # still talking; hold the turn
@@ -200,6 +200,9 @@ class VoiceConversation:
         speaking-stopped signal, not to a silence timer."""
         if not self.is_active:
             return
+        logger.info(
+            "STT fragment (learner_speaking=%s): %s", self._learner_speaking, text
+        )
         self._pending_utterances.append(text)
         if not self._learner_speaking:
             self._schedule_flush()
@@ -227,6 +230,7 @@ class VoiceConversation:
         self._pending_utterances.clear()
         if not text:
             return
+        logger.info("Flushing merged turn: %s", text)
         self._generation += 1
         if self._turn_task is not None and not self._turn_task.done():
             self._turn_task.cancel()
@@ -248,6 +252,9 @@ class VoiceConversation:
                     with contextlib.suppress(OSError):
                         clips.append(path.read_bytes())
             self._filler_clips = clips
+            logger.info(
+                "Filler clips loaded: %d (dir: %s).", len(clips), self._filler_dir
+            )
         return self._filler_clips
 
     async def _run_turn(self, generation: int, learner_text: str) -> None:
@@ -283,6 +290,7 @@ class VoiceConversation:
                 except asyncio.TimeoutError:
                     if generation != self._generation:
                         break
+                    logger.info("pi still thinking — playing filler %d.", index + 1)
                     await self._play_filler(generation, clips[index % len(clips)])
                     index += 1
             return await ask
