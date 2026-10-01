@@ -39,6 +39,15 @@ class STTProvider:
     def feed(self, pcm_mono_16k: bytes) -> None:
         raise NotImplementedError
 
+    def finalize(self) -> None:
+        """Hint that the speaker is done; flush any pending utterance.
+
+        Called when the hub reports the learner stopped speaking (e.g.
+        push-to-talk release). Providers that buffer or endpoint may use
+        it to force an utterance boundary; the default is a no-op so
+        providers without the concept stay valid.
+        """
+
     async def stop(self) -> None:
         raise NotImplementedError
 
@@ -105,6 +114,18 @@ class DeepgramSTT(STTProvider):
             return
         with contextlib.suppress(RuntimeError):
             asyncio.get_running_loop().create_task(ws.send(pcm_mono_16k))
+
+    def finalize(self) -> None:
+        """PTT release: ask Deepgram to endpoint immediately instead of
+        waiting out the silence timer — the button, not a guess, draws
+        the turn boundary."""
+        ws = self._ws
+        if ws is None:
+            return
+        with contextlib.suppress(RuntimeError):
+            asyncio.get_running_loop().create_task(
+                ws.send(json.dumps({"type": "Finalize"}))
+            )
 
     async def stop(self) -> None:
         self._stopped = True

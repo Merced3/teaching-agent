@@ -81,6 +81,7 @@ class VoiceRuntime:
                 tts=self._make_tts(),
                 ask_pi=self._ask_pi,
                 post_transcript=self._post_transcript,
+                filler_dir=self._settings.voice_filler_dir,
             )
         await self._conversation.join(channel_id)
 

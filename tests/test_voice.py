@@ -99,3 +99,120 @@ async def test_voice_model_failure_is_reported_not_raised() -> None:
     hub.post_followup.assert_awaited_once()
     args = hub.post_followup.call_args
     assert "Voice command failed" in args.args[1]
+
+
+# -- turn-taking: PTT finalize + thinking fillers ----------------------------
+
+import asyncio
+import json
+
+from teaching_agent.voice import conversation as conv
+from teaching_agent.voice.conversation import VoiceConversation
+
+
+class FakeSTT:
+    def __init__(self) -> None:
+        self.on_utterance = lambda _t: None
+        self.finalized = 0
+        self.fed = b""
+
+    async def start(self) -> None: ...
+    def feed(self, pcm: bytes) -> None:
+        self.fed += pcm
+    def finalize(self) -> None:
+        self.finalized += 1
+    async def stop(self) -> None: ...
+
+
+class FakeWS:
+    """Scripted inbound stream; records outbound frames."""
+
+    def __init__(self, messages: list[dict]) -> None:
+        self._messages = messages
+        self.sent: list[bytes] = []
+
+    def __aiter__(self):
+        async def gen():
+            for m in self._messages:
+                yield json.dumps(m)
+        return gen()
+
+    async def send(self, data) -> None:
+        if isinstance(data, bytes):
+            self.sent.append(data)
+
+    async def close(self) -> None: ...
+
+
+def make_conversation(ws_messages, *, ask_pi=None, filler_dir=None):
+    stt = FakeSTT()
+    conversation = VoiceConversation(
+        hub=AsyncMock(),
+        hub_ws_url="ws://unused",
+        owner="test",
+        allowed_user_id=42,
+        stt=stt,
+        tts=AsyncMock(),
+        ask_pi=ask_pi or (AsyncMock(return_value="reply")),
+        filler_dir=filler_dir,
+    )
+    ws = FakeWS(ws_messages)
+    conversation._ws = ws
+    return conversation, stt, ws
+
+
+async def test_ptt_release_finalizes_stt_turn() -> None:
+    conversation, stt, _ = make_conversation(
+        [
+            {"type": "speaking", "user_id": "42", "state": "started"},
+            {"type": "speaking", "user_id": "42", "state": "stopped"},
+        ]
+    )
+    await conversation._read_loop()
+    assert stt.finalized == 1
+
+
+async def test_other_users_speaking_stop_does_not_finalize() -> None:
+    conversation, stt, _ = make_conversation(
+        [{"type": "speaking", "user_id": "999", "state": "stopped"}]
+    )
+    await conversation._read_loop()
+    assert stt.finalized == 0
+
+
+async def test_filler_plays_during_slow_pi(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(conv, "_FILLER_DELAY_SECONDS", 0.05)
+    monkeypatch.setattr(conv, "_FILLER_INTERVAL_SECONDS", 0.05)
+    clip = b"\x01\x00" * (48000 * 2 // 10)  # 100 ms of hub-format PCM
+    (tmp_path / "filler-1.pcm").write_bytes(clip)
+
+    async def slow_pi(_text: str) -> str:
+        await asyncio.sleep(0.2)
+        return "reply"
+
+    conversation, _, ws = make_conversation([], ask_pi=slow_pi, filler_dir=tmp_path)
+    reply = await conversation._ask_with_fillers(conversation._generation, "hello")
+    assert reply == "reply"
+    assert ws.sent  # at least one filler frame went out before pi answered
+
+
+async def test_no_filler_when_pi_is_fast(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(conv, "_FILLER_DELAY_SECONDS", 0.2)
+    (tmp_path / "filler-1.pcm").write_bytes(b"\x01\x00" * 9600)
+
+    async def fast_pi(_text: str) -> str:
+        return "reply"
+
+    conversation, _, ws = make_conversation([], ask_pi=fast_pi, filler_dir=tmp_path)
+    reply = await conversation._ask_with_fillers(conversation._generation, "hello")
+    assert reply == "reply"
+    assert not ws.sent
+
+
+async def test_missing_filler_dir_is_silent_noop(tmp_path) -> None:
+    conversation, _, ws = make_conversation(
+        [], filler_dir=tmp_path / "does-not-exist"
+    )
+    reply = await conversation._ask_with_fillers(conversation._generation, "hello")
+    assert reply == "reply"
+    assert not ws.sent

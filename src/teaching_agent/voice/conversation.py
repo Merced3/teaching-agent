@@ -23,7 +23,8 @@ import base64
 import contextlib
 import json
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from pathlib import Path
 from typing import Any
 
 import websockets
@@ -40,6 +41,9 @@ _MAX_LEAD_SECONDS = 0.300  # stay this far ahead of playback (bounds barge-in la
 
 AskPi = Callable[[str], Awaitable[str | None]]
 PostTranscript = Callable[[str, str], Awaitable[None]]
+
+_FILLER_DELAY_SECONDS = 2.0  # pi silence this long -> first "Mm."
+_FILLER_INTERVAL_SECONDS = 3.0  # then repeat (rotating clips) until pi answers
 
 _VOICE_TURN_TEMPLATE = (
     "[voice session — spoken turn] The learner said (speech-to-text): {text}\n"
@@ -63,6 +67,7 @@ class VoiceConversation:
         tts: TTSProvider,
         ask_pi: AskPi,
         post_transcript: PostTranscript | None = None,
+        filler_dir: Path | None = None,
     ) -> None:
         self._hub = hub
         self._hub_ws_url = hub_ws_url
@@ -72,6 +77,8 @@ class VoiceConversation:
         self._tts = tts
         self._ask_pi = ask_pi
         self._post_transcript = post_transcript
+        self._filler_dir = filler_dir
+        self._filler_clips: list[bytes] | None = None  # lazy: loaded on first use
 
         self._ws: websockets.ClientConnection | None = None
         self._reader_task: asyncio.Task[None] | None = None
@@ -157,6 +164,11 @@ class VoiceConversation:
                     logger.debug("learner speaking %s", event.get("state"))
                     if event.get("state") == "started":
                         self._interrupt()
+                    elif event.get("state") == "stopped":
+                        # With push-to-talk, the key release IS the turn
+                        # boundary — no silence-guessing. Flush the STT so
+                        # the utterance fires now. Harmless without PTT.
+                        self._stt.finalize()
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -183,10 +195,23 @@ class VoiceConversation:
 
     # -- one turn -----------------------------------------------------------
 
+    def _load_fillers(self) -> list[bytes]:
+        """Pre-generated hub-format (s16le 48 kHz stereo) "thinking" clips.
+        Missing directory = fillers silently off; they are a courtesy
+        signal, never a requirement."""
+        if self._filler_clips is None:
+            clips: list[bytes] = []
+            if self._filler_dir is not None and self._filler_dir.is_dir():
+                for path in sorted(self._filler_dir.glob("*.pcm")):
+                    with contextlib.suppress(OSError):
+                        clips.append(path.read_bytes())
+            self._filler_clips = clips
+        return self._filler_clips
+
     async def _run_turn(self, generation: int, learner_text: str) -> None:
         logger.info("Voice turn %d — learner: %s", generation, learner_text)
         try:
-            reply = await self._ask_pi(_VOICE_TURN_TEMPLATE.format(text=learner_text))
+            reply = await self._ask_with_fillers(generation, learner_text)
             if generation != self._generation or not reply:
                 return
             await self._speak(generation, reply)
@@ -197,16 +222,52 @@ class VoiceConversation:
         except Exception:
             logger.exception("Voice turn %d failed.", generation)
 
+    async def _ask_with_fillers(self, generation: int, learner_text: str) -> str | None:
+        """Ask pi; while it thinks in silence, hold the floor with a short
+        pre-generated "Mm." so the learner knows to wait — a courtesy
+        signal, not a second LLM job."""
+        ask = asyncio.ensure_future(
+            self._ask_pi(_VOICE_TURN_TEMPLATE.format(text=learner_text))
+        )
+        clips = self._load_fillers()
+        if not clips:
+            return await ask
+        index = 0
+        try:
+            while not ask.done():
+                delay = _FILLER_DELAY_SECONDS if index == 0 else _FILLER_INTERVAL_SECONDS
+                try:
+                    await asyncio.wait_for(asyncio.shield(ask), timeout=delay)
+                except asyncio.TimeoutError:
+                    if generation != self._generation:
+                        break
+                    await self._play_filler(generation, clips[index % len(clips)])
+                    index += 1
+            return await ask
+        except asyncio.CancelledError:
+            ask.cancel()
+            raise
+
+    async def _play_filler(self, generation: int, pcm: bytes) -> None:
+        async def chunks() -> AsyncIterator[bytes]:
+            yield pcm
+
+        await self._stream_pcm(generation, chunks())
+
     async def _speak(self, generation: int, text: str) -> None:
-        """Stream TTS into the hub, paced ~300 ms ahead of playback so an
-        interruption leaves almost nothing buffered hub-side."""
+        await self._stream_pcm(generation, self._tts.stream_hub_pcm(text))
+
+    async def _stream_pcm(self, generation: int, chunks: AsyncIterator[bytes]) -> None:
+        """Stream hub-format PCM into the hub, paced ~300 ms ahead of
+        playback so an interruption leaves almost nothing buffered
+        hub-side."""
         ws = self._ws
         if ws is None:
             return
         started = asyncio.get_running_loop().time()
         frames_sent = 0
         buffer = b""
-        async for chunk in self._tts.stream_hub_pcm(text):
+        async for chunk in chunks:
             if generation != self._generation:
                 return
             buffer += chunk
