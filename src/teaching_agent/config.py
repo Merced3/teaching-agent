@@ -43,6 +43,8 @@ class Settings:
     recall_check_interval_seconds: int
     voice_enabled: bool
     voice_autojoin: bool
+    voice_transport: str
+    voice_bridge_url: str
     voice_stt_provider: str
     voice_tts_provider: str
     voice_tts_voice_id: str
@@ -105,6 +107,16 @@ class Settings:
         voice_autojoin = _parse_bool(
             environment.get("TEACHING_AGENT_VOICE_AUTOJOIN", "true")
         )
+        voice_transport = environment.get(
+            "TEACHING_AGENT_VOICE_TRANSPORT", "discord"
+        ).strip()
+        if voice_transport not in ("discord", "bridge"):
+            raise ConfigurationError(
+                "TEACHING_AGENT_VOICE_TRANSPORT must be 'discord' or 'bridge'."
+            )
+        voice_bridge_url = environment.get(
+            "TEACHING_AGENT_VOICE_BRIDGE_URL", "http://localhost:8200"
+        ).strip()
         voice_stt_provider = environment.get("TEACHING_AGENT_VOICE_STT", "deepgram").strip()
         voice_tts_provider = environment.get("TEACHING_AGENT_VOICE_TTS", "elevenlabs").strip()
         voice_tts_voice_id = environment.get("TEACHING_AGENT_VOICE_TTS_VOICE_ID", "").strip()
@@ -160,6 +172,8 @@ class Settings:
             recall_check_interval_seconds=recall_check_interval_seconds,
             voice_enabled=voice_enabled,
             voice_autojoin=voice_autojoin,
+            voice_transport=voice_transport,
+            voice_bridge_url=voice_bridge_url,
             voice_stt_provider=voice_stt_provider,
             voice_tts_provider=voice_tts_provider,
             voice_tts_voice_id=voice_tts_voice_id,

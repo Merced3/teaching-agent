@@ -273,8 +273,9 @@ class TeachingEngine:
     async def _handle_voice_state(self, payload: dict[str, Any]) -> None:
         """Learner joined/left/moved voice channels (registration opted in).
         Auto-join policy: follow the learner into whatever channel they enter;
-        end the session when they leave voice entirely."""
-        if self._voice is None:
+        end the session when they leave voice entirely. Only meaningful on the
+        discord transport — the bridge has no Discord voice channels."""
+        if self._voice is None or not self._voice.requires_channel:
             return None
         user = payload.get("user") or {}
         if str(user.get("id")) != str(self._settings.discord_allowed_user_id):
@@ -311,6 +312,11 @@ class TeachingEngine:
 
         try:
             if action == "start":
+                if not self._voice.requires_channel:
+                    # Bridge transport: the phone page is the room; no channel.
+                    await self._voice.join()
+                    await say("Voice session started on the bridge. Open the page and hold the button.")
+                    return
                 channel_id = int(value) if value else self._last_voice_channel_id
                 if channel_id is None:
                     await say(

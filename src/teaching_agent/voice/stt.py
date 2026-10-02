@@ -76,13 +76,53 @@ class DeepgramSTT(STTProvider):
         self._ws: websockets.ClientConnection | None = None
         self._reader: asyncio.Task[None] | None = None
         self._keepalive: asyncio.Task[None] | None = None
+        self._sender: asyncio.Task[None] | None = None
+        # All outbound frames go through this queue: fire-and-forget
+        # create_task sends can reorder a Finalize ahead of the audio it is
+        # meant to close, and Deepgram then strands the whole utterance.
+        self._outbox: asyncio.Queue[bytes | dict] = asyncio.Queue()
         self._stopped = False
+        # Set by finalize(): the next is_final result completes the turn,
+        # with or without a speech_final — Deepgram's Finalize response is
+        # not reliable about sending one.
+        self._finalize_pending = False
 
     async def start(self) -> None:
         self._stopped = False
         await self._connect()
         self._reader = asyncio.create_task(self._read_loop(), name="deepgram-reader")
         self._keepalive = asyncio.create_task(self._keepalive_loop(), name="deepgram-keepalive")
+        self._sender = asyncio.create_task(self._send_loop(), name="deepgram-sender")
+
+    _SILENCE_FRAME = b"\x00" * 640  # 20 ms of s16le 16 kHz mono
+
+    async def _send_loop(self) -> None:
+        """Single ordered sender: audio frames and control messages reach
+        Deepgram in exactly the order the conversation produced them.
+
+        When the conversation has no audio to give (mic gated by the talk
+        button, learner silent), we still stream silence at 20 ms cadence:
+        Deepgram's endpointing only advances while audio flows, so a dead
+        feed would freeze every pending utterance mid-stream.
+        """
+        try:
+            while True:
+                try:
+                    item = await asyncio.wait_for(self._outbox.get(), timeout=0.02)
+                except TimeoutError:
+                    item = self._SILENCE_FRAME
+                ws = self._ws
+                if ws is None:
+                    continue
+                if isinstance(item, dict):
+                    logger.debug("DG send: %s", item)
+                    await ws.send(json.dumps(item))
+                else:
+                    await ws.send(item)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Deepgram sender died.")
 
     async def _connect(self) -> None:
         try:
@@ -109,31 +149,25 @@ class DeepgramSTT(STTProvider):
             raise
 
     def feed(self, pcm_mono_16k: bytes) -> None:
-        ws = self._ws
-        if ws is None:
-            return
-        with contextlib.suppress(RuntimeError):
-            asyncio.get_running_loop().create_task(ws.send(pcm_mono_16k))
+        self._outbox.put_nowait(pcm_mono_16k)
 
     def finalize(self) -> None:
         """PTT release: ask Deepgram to endpoint immediately instead of
         waiting out the silence timer — the button, not a guess, draws
-        the turn boundary."""
-        ws = self._ws
-        if ws is None:
-            return
-        with contextlib.suppress(RuntimeError):
-            asyncio.get_running_loop().create_task(
-                ws.send(json.dumps({"type": "Finalize"}))
-            )
+        the turn boundary. Queued behind the audio it closes."""
+        self._finalize_pending = True
+        self._outbox.put_nowait({"type": "Finalize"})
 
     async def stop(self) -> None:
         self._stopped = True
-        for task in (self._reader, self._keepalive):
+        for task in (self._reader, self._keepalive, self._sender):
             if task is not None:
                 task.cancel()
         self._reader = None
         self._keepalive = None
+        self._sender = None
+        while not self._outbox.empty():
+            self._outbox.get_nowait()
         if self._ws is not None:
             try:
                 await self._ws.send(json.dumps({"type": "CloseStream"}))
@@ -164,20 +198,36 @@ class DeepgramSTT(STTProvider):
         assert self._ws is not None
         async for raw in self._ws:
             message = json.loads(raw)
+            if message.get("type") == "Results":
+                logger.debug(
+                    "DG results: final=%s speech_final=%s",
+                    message.get("is_final"), message.get("speech_final"),
+                )
             if message.get("type") != "Results":
                 continue
             channel = message.get("channel") or {}
             alternatives = channel.get("alternatives") or []
             transcript = str(alternatives[0].get("transcript", "")) if alternatives else ""
-            if not transcript:
-                continue
-            if message.get("is_final"):
+            if transcript and message.get("is_final"):
                 current.append(transcript)
+            # speech_final can arrive on its own message with an EMPTY
+            # transcript (e.g. the answer to a Finalize): it still flushes
+            # whatever finals accumulated before it. Guarding the flush on
+            # a non-empty transcript strands the utterance forever.
             if message.get("speech_final"):
                 utterance = " ".join(current).strip()
                 current = []
+                self._finalize_pending = False
                 if utterance:
                     self.on_utterance(utterance)
+            elif self._finalize_pending and message.get("is_final") and current:
+                # The Finalize response Deepgram is SUPPOSED to send (an
+                # is_final closing the utterance) — take it and move on
+                # rather than hoping a speech_final follows.
+                utterance = " ".join(current).strip()
+                current = []
+                self._finalize_pending = False
+                self.on_utterance(utterance)
         return current
 
 

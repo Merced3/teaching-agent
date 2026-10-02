@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from contextlib import suppress
 
 import uvicorn
@@ -36,7 +37,12 @@ def build_engine(settings: Settings) -> TeachingEngine:
     )
     engine = TeachingEngine(settings, hub, pi)
     if settings.voice_enabled:
-        remote_ptt = RemotePTT()
+        # Remote PTT is an out-of-band turn boundary needed only because
+        # Discord hides the learner's PTT key state; the bridge delivers
+        # exact press/release edges inside the voice stream itself.
+        remote_ptt = (
+            RemotePTT() if settings.voice_transport == "discord" else None
+        )
         engine.remote_ptt = remote_ptt
         engine.set_voice(
             VoiceRuntime(
@@ -107,7 +113,8 @@ async def agent_service(ctx: ServiceContext) -> None:
 
 def main() -> None:
     logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+        level=os.environ.get("TEACHING_AGENT_LOG_LEVEL", "INFO").upper(),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     harness = Harness(HarnessConfig(data_dir="data"), name="teaching-agent")
     harness.add_service("teaching-agent", agent_service)

@@ -105,6 +105,7 @@ async def test_voice_model_failure_is_reported_not_raised() -> None:
 
 import asyncio
 import json
+from types import SimpleNamespace
 
 from teaching_agent.voice import conversation as conv
 from teaching_agent.voice.conversation import VoiceConversation
@@ -146,11 +147,15 @@ class FakeWS:
 
 def make_conversation(ws_messages, *, ask_pi=None, filler_dir=None):
     stt = FakeSTT()
+    transport = SimpleNamespace(
+        speaker_id="42",
+        stream_url=lambda owner: "ws://unused/voice/stream",
+        join=AsyncMock(),
+        leave=AsyncMock(),
+    )
     conversation = VoiceConversation(
-        hub=AsyncMock(),
-        hub_ws_url="ws://unused",
+        transport=transport,
         owner="test",
-        allowed_user_id=42,
         stt=stt,
         tts=AsyncMock(),
         ask_pi=ask_pi or (AsyncMock(return_value="reply")),
@@ -351,3 +356,106 @@ async def test_ptt_routes_and_auth() -> None:
         assert hb.status_code == 204 and ptt.connected
         page = await client.get("/ptt")
         assert page.status_code == 200 and "Hold to talk" in page.text
+
+
+# -- transports ---------------------------------------------------------------
+
+from teaching_agent.voice.transport import BridgeTransport, DiscordTransport
+
+
+async def test_discord_transport_joins_hub_and_targets_learner() -> None:
+    hub = AsyncMock()
+    transport = DiscordTransport(hub, "ws://hub:8100", allowed_user_id=42)
+    assert transport.requires_channel
+    assert transport.speaker_id == "42"
+    assert transport.stream_url("me") == "ws://hub:8100/voice/stream?owner=me"
+    await transport.join(7, "me")
+    hub.voice_join.assert_awaited_once_with(7, "me")
+    await transport.leave("me")
+    hub.voice_leave.assert_awaited_once_with("me")
+
+
+async def test_bridge_transport_is_channel_less_and_speaks_page_events() -> None:
+    transport = BridgeTransport("ws://bridge:8200")
+    assert not transport.requires_channel
+    assert transport.speaker_id == "page"
+    assert transport.stream_url("me") == "ws://bridge:8200/voice/stream?owner=me"
+    # join/leave are no-ops: there is no channel to acquire on the bridge.
+    assert await transport.join(None, "me") is None
+    assert await transport.leave("me") is None
+
+
+async def test_bridge_press_release_edges_drive_turns() -> None:
+    """On the bridge, speaking events ARE the button: release finalizes the
+    turn with no remote-PTT side channel attached."""
+    conversation, stt, _ = make_conversation(
+        [
+            {"type": "speaking", "user_id": "page", "state": "started"},
+            {"type": "speaking", "user_id": "page", "state": "stopped"},
+        ]
+    )
+    conversation._transport.speaker_id = "page"
+    assert conversation._remote_ptt is None
+    await conversation._read_loop()
+    assert stt.finalized == 1
+
+
+async def test_stt_empty_speech_final_still_flushes_utterance() -> None:
+    """Deepgram sends the final transcript with is_final, then a SEPARATE
+    speech_final message whose transcript is empty (the Finalize response).
+    The empty message must still flush the accumulated utterance — this was
+    the 2026-10 dead-air bug: turns never fired."""
+    import json as _json
+
+    from teaching_agent.voice.stt import DeepgramSTT
+
+    messages = [
+        {"type": "Results", "is_final": True, "speech_final": False,
+         "channel": {"alternatives": [{"transcript": "what is recursion"}]}},
+        {"type": "Results", "is_final": True, "speech_final": True,
+         "channel": {"alternatives": [{"transcript": ""}]}},
+    ]
+
+    class FakeDGSocket:
+        def __aiter__(self):
+            async def gen():
+                for m in messages:
+                    yield _json.dumps(m)
+            return gen()
+
+    stt = DeepgramSTT("key")
+    stt._ws = FakeDGSocket()
+    heard: list[str] = []
+    stt.on_utterance = heard.append
+    remainder = await stt._consume([])
+    assert heard == ["what is recursion"]
+    assert remainder == []
+
+
+async def test_stt_finalize_pending_fires_on_next_final_without_speech_final() -> None:
+    """Deepgram's Finalize response is unreliable about speech_final; after
+    a finalize() the next is_final with accumulated text IS the utterance."""
+    import json as _json
+
+    from teaching_agent.voice.stt import DeepgramSTT
+
+    messages = [
+        {"type": "Results", "is_final": True, "speech_final": False,
+         "channel": {"alternatives": [{"transcript": "what is recursion"}]}},
+        # ...and then silence forever: no speech_final ever arrives.
+    ]
+
+    class FakeDGSocket:
+        def __aiter__(self):
+            async def gen():
+                for m in messages:
+                    yield _json.dumps(m)
+            return gen()
+
+    stt = DeepgramSTT("key")
+    stt._ws = FakeDGSocket()
+    stt._finalize_pending = True  # as finalize() sets
+    heard: list[str] = []
+    stt.on_utterance = heard.append
+    await stt._consume([])
+    assert heard == ["what is recursion"]

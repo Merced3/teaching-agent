@@ -16,6 +16,7 @@ from ..config import Settings
 from .conversation import AskPi, PostTranscript, VoiceConversation
 from .ptt import RemotePTT
 from .stt import STT_PROVIDERS, DeepgramSTT, STTProvider
+from .transport import BridgeTransport, DiscordTransport, VoiceTransport
 from .tts import TTS_PROVIDERS, ElevenLabsTTS, TTSProvider
 
 logger = logging.getLogger(__name__)
@@ -35,18 +36,32 @@ class VoiceRuntime:
         remote_ptt: RemotePTT | None = None,
     ) -> None:
         self._settings = settings
-        self._hub = hub
         self._ask_pi = ask_pi
         self._post_transcript = post_transcript
         self._owner = settings.callback_url
-        self._hub_ws_url = settings.hub_url.replace("http://", "ws://").replace(
-            "https://", "wss://"
-        )
+        self._transport = self._make_transport(settings, hub)
         self._stt_name = settings.voice_stt_provider
         self._tts_name = settings.voice_tts_provider
         self._voice_id = settings.voice_tts_voice_id
         self._remote_ptt = remote_ptt
         self._conversation: VoiceConversation | None = None
+
+    @staticmethod
+    def _make_transport(settings: Settings, hub: Any) -> VoiceTransport:
+        if settings.voice_transport == "bridge":
+            bridge_ws_url = settings.voice_bridge_url.replace(
+                "http://", "ws://"
+            ).replace("https://", "wss://")
+            return BridgeTransport(bridge_ws_url)
+        if settings.voice_transport == "discord":
+            hub_ws_url = settings.hub_url.replace("http://", "ws://").replace(
+                "https://", "wss://"
+            )
+            return DiscordTransport(hub, hub_ws_url, settings.discord_allowed_user_id)
+        raise VoiceError(
+            f"Unknown voice transport {settings.voice_transport!r}. "
+            "Available: discord, bridge"
+        )
 
     # -- introspection ------------------------------------------------------
 
@@ -58,6 +73,11 @@ class VoiceRuntime:
     def channel_id(self) -> int | None:
         return self._conversation.channel_id if self._conversation else None
 
+    @property
+    def requires_channel(self) -> bool:
+        """Discord sessions start in a channel; the bridge is channel-less."""
+        return self._transport.requires_channel
+
     def describe(self) -> str:
         state = (
             f"active in channel {self.channel_id}"
@@ -66,6 +86,7 @@ class VoiceRuntime:
         )
         return (
             f"Voice {state}\n"
+            f"Transport: {self._settings.voice_transport}\n"
             f"STT (ears): {self._stt_name} — available: {', '.join(STT_PROVIDERS)}\n"
             f"TTS (voice): {self._tts_name} — available: {', '.join(TTS_PROVIDERS)}\n"
             f"TTS voice id: {self._voice_id or '(unset)'}"
@@ -73,13 +94,11 @@ class VoiceRuntime:
 
     # -- session ------------------------------------------------------------
 
-    async def join(self, channel_id: int) -> None:
+    async def join(self, channel_id: int | None = None) -> None:
         if self._conversation is None:
             self._conversation = VoiceConversation(
-                hub=self._hub,
-                hub_ws_url=self._hub_ws_url,
+                transport=self._transport,
                 owner=self._owner,
-                allowed_user_id=self._settings.discord_allowed_user_id,
                 stt=self._make_stt(),
                 tts=self._make_tts(),
                 ask_pi=self._ask_pi,

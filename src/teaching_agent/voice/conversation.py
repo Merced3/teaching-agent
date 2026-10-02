@@ -1,8 +1,9 @@
 """The full-duplex voice conversation with the learner.
 
-Transport: discord-hub owns Discord. We ``POST /voice/join``, then attach
-the duplex stream (``WS /voice/stream``): per-speaker PCM frames and
-speaking events flow in, PCM frames flow out and play continuously.
+Transport: swappable via ``VoiceTransport`` (discord-hub or voice-bridge;
+see ``transport.py``). We join (a no-op on the bridge), then attach the
+duplex stream (``WS /voice/stream``): per-speaker PCM frames and speaking
+events flow in, PCM frames flow out and play continuously.
 
 Pipeline per turn: utterance (STT) → pi (same session as text; the
 teacher) → streamed TTS → paced frames to the hub.
@@ -25,13 +26,13 @@ import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
-from typing import Any
 
 import websockets
 
 from .pcm import stereo_48k_to_mono_16k
 from .ptt import RemotePTT
 from .stt import STTProvider
+from .transport import VoiceTransport
 from .tts import TTSProvider
 
 logger = logging.getLogger(__name__)
@@ -62,10 +63,8 @@ class VoiceConversation:
     def __init__(
         self,
         *,
-        hub: Any,
-        hub_ws_url: str,
+        transport: VoiceTransport,
         owner: str,
-        allowed_user_id: int,
         stt: STTProvider,
         tts: TTSProvider,
         ask_pi: AskPi,
@@ -73,10 +72,8 @@ class VoiceConversation:
         filler_dir: Path | None = None,
         remote_ptt: RemotePTT | None = None,
     ) -> None:
-        self._hub = hub
-        self._hub_ws_url = hub_ws_url
+        self._transport = transport
         self._owner = owner
-        self._allowed_user_id = str(allowed_user_id)
         self._stt = stt
         self._tts = tts
         self._ask_pi = ask_pi
@@ -134,21 +131,18 @@ class VoiceConversation:
     def is_active(self) -> bool:
         return self._ws is not None
 
-    async def join(self, channel_id: int) -> None:
+    async def join(self, channel_id: int | None = None) -> None:
         if self.is_active:
             if self.channel_id == channel_id:
                 return
             await self.leave()
-        await self._hub.voice_join(channel_id, self._owner)
+        await self._transport.join(channel_id, self._owner)
         self.channel_id = channel_id
         if self._remote_ptt is not None:
             self._remote_ptt.on_press = self._remote_press
             self._remote_ptt.on_release = self._remote_release
-        if self._remote_ptt is not None:
-            self._remote_ptt.on_press = self._remote_press
-            self._remote_ptt.on_release = self._remote_release
         self._ws = await websockets.connect(
-            f"{self._hub_ws_url}/voice/stream?owner={self._owner}",
+            self._transport.stream_url(self._owner),
             max_size=8 * 1024 * 1024,
         )
         self._wire_stt()
@@ -174,7 +168,7 @@ class VoiceConversation:
         channel_id = self.channel_id
         self.channel_id = None
         with contextlib.suppress(Exception):
-            await self._hub.voice_leave(self._owner)
+            await self._transport.leave(self._owner)
         logger.info("Voice session ended (was channel %s).", channel_id)
 
     def _wire_stt(self) -> None:
@@ -189,7 +183,7 @@ class VoiceConversation:
                 if isinstance(raw, bytes):
                     continue
                 event = json.loads(raw)
-                if event.get("user_id") != self._allowed_user_id:
+                if event.get("user_id") != self._transport.speaker_id:
                     continue
                 if event.get("type") == "audio":
                     pcm = base64.b64decode(event["pcm"])
