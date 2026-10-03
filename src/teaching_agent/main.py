@@ -37,7 +37,10 @@ def build_engine(settings: Settings) -> TeachingEngine:
             f"Required pi extension missing: {extension} "
             "(write-boundary enforcement; refusing to start without it)"
         )
-    extra_arguments = ("--extension", str(extension))
+    extra_arguments = (
+        "--extension",
+        str(extension),
+    )
     pi = PiRpcClient(
         executable=settings.pi_executable,
         working_directory=settings.knowledge_root,

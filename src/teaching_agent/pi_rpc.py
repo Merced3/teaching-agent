@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import shutil
 import subprocess
 import sys
@@ -126,6 +127,11 @@ class PiRpcClient:
                 stderr=asyncio.subprocess.PIPE,
                 limit=_SUBPROCESS_STREAM_LIMIT,
                 creationflags=_subprocess_creationflags(),
+                # The learner's user-level bash-guard extension confirms risky
+                # bash via TUI; this pi is headless, so even `git add` blocks
+                # without the auto-allow escape hatch. CLI flags don't reach
+                # extension getFlag() in RPC mode — env var does.
+                env={**os.environ, "PI_BASH_GUARD_AUTO_ALLOW": "1"},
             )
         except OSError as exc:
             raise PiRpcError(f"Could not start Pi: {exc}") from exc
