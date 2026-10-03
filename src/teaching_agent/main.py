@@ -26,6 +26,13 @@ logger = logging.getLogger(__name__)
 
 def build_engine(settings: Settings) -> TeachingEngine:
     hub = HubClient(settings.hub_url)
+    # The teacher teaches, it does not build: a pi extension physically
+    # blocks write/edit outside the knowledge base and limits bash to
+    # read-only commands + git (decision log 2026-10-02).
+    extension = settings.knowledge_root / "tools" / "knowledge-only-writes.ts"
+    extra_arguments = (
+        ("--extension", str(extension)) if extension.is_file() else ()
+    )
     pi = PiRpcClient(
         executable=settings.pi_executable,
         working_directory=settings.knowledge_root,
@@ -33,6 +40,7 @@ def build_engine(settings: Settings) -> TeachingEngine:
         session_name=settings.agent_name.lower().replace(" ", "-"),
         model=settings.pi_model,
         system_prompt=build_system_prompt(settings, test_mode=settings.test_mode),
+        extra_arguments=extra_arguments,
         timeout_seconds=settings.pi_timeout_seconds,
     )
     engine = TeachingEngine(settings, hub, pi)

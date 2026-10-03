@@ -32,6 +32,10 @@ _COMMANDS = [
     {"name": "recall", "description": "Run any recall checks that are due, right now."},
     {"name": "close", "description": "Close the session: update the knowledge base and commit."},
     {
+        "name": "next",
+        "description": "What should I focus on? Owed recall checks + the recommended next lesson.",
+    },
+    {
         # Named /progress, not /status: command names are unique across ALL
         # projects on the hub, and socratic-partner owns "status" (2026-09-30
         # collision, first live multi-client evidence for integrations §6).
@@ -104,6 +108,13 @@ _COMMAND_PROMPTS = {
         "changed, record the next owed recall check, write a session log under "
         "sessions/, then commit the changes to git. Confirm briefly what you wrote."
     ),
+    "next": (
+        "The learner ran /next. Check the real date (the [date:] prefix), then read "
+        "docs/current-state.md, the maps in maps/, and recent session logs. Give a "
+        "short prioritized list: first any recall checks that are due or overdue "
+        "(say how overdue), then the ONE next lesson you recommend and a sentence "
+        "why. Under 12 sentences. This is a menu, not a lecture."
+    ),
     "progress": (
         "The learner ran /progress. In under 10 sentences: the loop's purpose, my "
         "current known state, and the next milestone, per docs/current-state.md and "
@@ -112,10 +123,11 @@ _COMMAND_PROMPTS = {
 }
 
 _RECALL_TICK_PROMPT = (
-    "This is a scheduled recall tick, not a learner message. Check the real current "
-    "date, then read docs/current-state.md and the relevant session logs. If any "
-    "recall checks are due or overdue, ask the learner ONE of them now, plainly, "
-    "one new word per sentence. If nothing is due, reply with exactly: SILENT"
+    "This is a scheduled check-in, not a learner message. The [date:] prefix is the "
+    "real current date — compute elapsed time from it. Read docs/current-state.md "
+    "and the relevant session logs. If any recall checks are due or overdue, ask the "
+    "learner ONE of them now, plainly, one new word per sentence, and close with one "
+    "sentence on what comes next after it. If nothing is due, reply with exactly: SILENT"
 )
 
 # Test mode is a real boundary: pi runs with read-only tools, so the
@@ -148,6 +160,11 @@ def build_system_prompt(settings: Settings, *, test_mode: bool) -> str:
         "- Your final assistant text each turn is posted verbatim to Discord. "
         "Never include internal notes in it.",
         "- Git-commit knowledge-base changes at session close.",
+        "- You teach, you do not build: your write/edit tools only reach the "
+        "knowledge base (docs/, maps/, sessions/, lessons/) and your shell is "
+        "read-only plus git. This is enforced at the tool level — attempts to "
+        "change code or config fail by design. Describe desired code changes "
+        "in chat instead.",
         "- Lesson threads are how the channel stays clean: the main channel "
         "is an index of evidence, transcripts and working-out are exhaust "
         "that belongs in a thread. You control this with directive lines "

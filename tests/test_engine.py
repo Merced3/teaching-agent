@@ -274,3 +274,12 @@ async def test_lesson_command_status_reports(tmp_path) -> None:
     engine, hub, pi = make_engine(lesson_env(tmp_path))
     await engine.dispatch(command("lesson", {"action": "status"}))
     assert "No active lesson" in hub.post_followup.await_args.args[1]
+
+
+async def test_next_command_prompts_pi_with_the_menu() -> None:
+    engine, hub, pi = await _started()
+    result = await engine.dispatch(command("next"))
+    assert result == {"defer": True, "ephemeral": False}
+    await __import__("asyncio").sleep(0)
+    sent = pi.prompt.await_args.args[0]
+    assert "/next" in sent and "recommend" in sent
