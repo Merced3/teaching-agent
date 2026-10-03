@@ -322,3 +322,47 @@ Verdict: keep.
 - Last blocker was browser security, not code: `getUserMedia` is blocked on plain-HTTP LAN URLs (iOS Safari especially), so the page heartbeated but never opened its audio socket (`pages_connected: 0`). Fixed by serving over Tailscale HTTPS (real cert, off-LAN for free) + a page that says so instead of failing silently, and an AudioContext resume that was hanging iOS outside a user gesture.
 - Bonus built in the same push: page-side input modes (push-to-talk / voice activity, identical edges to consumers — ADR 0003 in voice-bridge) and a decoupled green-ring mic indicator (meter / gate / display).
 - Open follow-ups: VAD threshold may need room tuning; Discord-transport regression run (STT fixes apply there too); commit tonight's work in both repos.
+
+## 2026-10-02 (system clock; session follows the 2026-10-08 night entries) — Voice re-test: STT robustness spot-checks
+
+- **Context:** learner ran a casual voice session purely to test the pipeline.
+- **Evidence:** multiple spoken turns transcribed correctly, including mid-sentence pauses, fillers ("like", "whatever"), and a deliberately rambling message. No code touched; pure live verification.
+- **Verdict:** pipeline healthy. Untested in this session: different voices/accents, background noise, second speaker (suggested to learner).
+
+## 2026-10-02 (same voice session) — Channel hygiene: threads per lesson + milestones in main channel (learner-approved, to execute later)
+
+- **Problem:** every spoken exchange posts a 🎙 transcript to #learning, flooding the channel.
+- **Decision (learner approved in-session, execution deferred):** (1) transcripts go into a Discord **thread per lesson/session** (learner rejected daily threads as overfit — a lesson can span days or share a day), thread named after the topic; (2) the main channel only shows **milestones** — lesson started, what was learned (evidence level), lesson complete. This mirrors the thesis: raw transcripts are exhaust; evidence is the product.
+- **Also from this session:** (a) new operating rule — the agent must **ask before editing anything** project-side (voice ambiguity + eyes-free use make accidental edits likely); (b) learner wants the channel to serve more than just this agent long-term (multi-project surface — one need noted); (c) ElevenLabs TTS cost is unsustainable — local TTS (e.g. Piper/Kokoro-style) is the desired direction; TTS layer is already swappable, so it's a config-level change when picked up.
+- **Status:** logged only; nothing implemented yet.
+
+## 2026-10-02 — Lesson threads implemented: pi-directed threads per lesson + milestones in main channel
+
+- **Hypothesis:** the 2026-10-02 learner-approved channel-hygiene decision can be built without new hub features and without code-owned pedagogy: pi decides lesson boundaries (brain), the engine only transports them (plumbing) — same split as slash-commands-as-prompts.
+- **What was built:** `src/teaching_agent/lessons.py` (LessonManager) + engine wiring. Pi emits stripped directive lines — `[lesson: start | <topic>]`, `[lesson: milestone | <evidence>]`, `[lesson: end | <summary>]` — taught via the system prompt's channel rules. Start creates a hub thread named after the topic and posts 📘 to main; milestone posts 📍; end posts ✅ and clears the binding. Voice 🎙 transcripts route into the active lesson thread instead of flooding main; main-channel addressed messages still answer in main (main stays the notepad). The active binding persists in `data/lesson-state.json` (`TEACHING_AGENT_LESSON_STATE_FILE`) so a lesson spanning days survives restarts — operational state, deliberately not in the knowledge base. Directive stripping happens in `_ask_pi`, so it applies uniformly to chat, commands, recall ticks, and voice replies (markers never reach Discord or TTS).
+- **Design answers (learner, this session):** (1) pi decides boundaries via directives, not new /lesson commands — lesson start/end is pedagogy; (2) only transcripts + thread replies route into the thread, not all main-channel traffic.
+- **Hub:** no changes needed — `POST /threads` + post-by-thread-id + thread-inherited callbacks already cover it (contract confirmed against discord-hub docs/api.md and socratic-partner's usage).
+- **Evidence:** 42 tests green (6 new: start creates thread + strips directive, transcripts route to thread/main, end posts milestone + clears, restart resumes binding, mid-lesson milestone, no-directive passthrough); ruff clean on touched files. NOT yet evidence: a live lesson with a real thread; pi reliably emitting the directives is a prompt-following question the first live lesson will answer.
+- **Verdict:** built, awaiting live verification. Note: pre-existing ruff errors in untouched files (engine.py:332, voice/conversation.py UP041, test_voice.py E402) suggest ruff version drift since the last session — left alone here.
+
+## 2026-10-08 (voice recall check)
+- **Hypothesis (carried):** keyed-receipt trick would survive at ~3.5 weeks delay (2 prior fades at short intervals).
+- **Evidence:** Voice session. Learner recalled the two-part shape (write + receipt) unaided, but asserted the retry should FAIL — the purpose detail inverted. After one sharpening prompt, still wrong; re-presented (retry gets the recorded success, else dedup is pointless). Level: recognized after re-presentation, not recalled unaided.
+- **Verdict:** faded a 3rd time. Mechanism shape sticks, the receipt's purpose is the fragile bit. Next attempt switches to production rep (cold pseudocode) per plan; consider a concrete anchor story. Remaining owed checks (invariant/enforcement names, idempotent-vs-retry-safe, crash-window general form, node-5 applied grade) still outstanding.
+
+## 2026-10-02 — Test mode becomes a real boundary + per-turn real-date prefix
+
+- **Evidence that forced this:** first live lesson-directive test (voice, this evening) showed TWO prompt-boundary failures in one session: (1) pi wrote to docs/current-state.md while TEST MODE was on (a correct, faithful write — but the prompt said never write, and the model wrote anyway); (2) the write was dated 2026-10-08 with "~3.5 weeks delay" while the real date was 2026-10-02 — copied from the newest decision-log dates instead of the standing rule to check the real date. Learner independently noticed "AI gets a lot of dates wrong."
+- **What was built:** (1) Test mode is now code-enforced: pi launches with `--tools read,grep,find,ls` (no write, no edit, no bash — bash can write). `/mode` toggling swaps the tool allowlist alongside the rebuilt prompt on subprocess restart. The prompt text now documents intent; the tool surface enforces it. (2) Every prompt the engine sends pi is prefixed `[date: YYYY-MM-DD]`, computed fresh per turn (system-prompt dates go stale; sessions span days), with a channel rule telling pi to trust the prefix over any date in the docs. Covers text, commands, recall ticks, and voice turns.
+- **Also found in that session:** pi never emitted a `[lesson: ...]` directive — the conversation was ambiguous (no topic settled, drifted into recall checks) and the prompt's trigger conditions were too loose. Directive rules rewritten with REQUIRED triggers (start when a topic is settled, end when a lesson wraps), recall-chat-is-not-a-lesson, and a tie-breaker (when in doubt, start).
+- **Evidence:** 44 tests green (new: tool allowlist in test mode, toggle restores full tools, every prompt carries the date; existing prompt assertions updated for the prefix); ruff clean on touched files. NOT yet evidence: a live lesson where pi emits directives, and a live test-mode session proving the write attempt now fails at the tool level.
+- **Verdict:** built, awaiting live verification. The current-state.md write from tonight was kept (content correct) but its date is wrong — pending learner decision on correcting it.
+
+## 2026-10-02 (later) — /lesson slash commands: deterministic backstop for thread generation
+
+- **Evidence that forced this:** the first live lesson after shipping directives produced NO thread — kimi-k3 judged the ambiguous session as not-a-lesson under loose prompt wording. Learner verdict: "thread generation doesn't feel reliable." Sharpened prompt triggers stay in place (REQUIRED on topic-settled / lesson-wrap), but prompt-only reliability is probabilistic by nature.
+- **What was built:** `/lesson action:start value:<topic>`, `/lesson action:end value:[summary]`, `/lesson action:status` — code-owned (same category as /mode), driving the exact same LessonManager binding the directives use. Pi directives remain the primary path; the command is the learner's override. Starting a lesson while one is active auto-closes the old one (superseded milestone).
+- **Confirmed for the learner:** voice is unaffected by how the lesson opens — /lesson start sets the binding, and from that point 🎙 transcripts post into the thread; typing in the thread also reaches pi (hub thread routing, unchanged).
+- **Also this session:** corrected tonight's current-state.md dates (2026-10-08 → 2026-10-02; "~3.5 weeks" → "~2 weeks"); the remaining 2026-10-08 label in "What exists" is a historical entry from the mixed-dating period, left as-is.
+- **Evidence:** 48 tests green (4 new: command start binds thread + transcripts route, end clears + milestone, start requires topic, status reports); ruff clean on touched files.
+- **Verdict:** built, awaiting live verification.

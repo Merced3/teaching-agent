@@ -66,6 +66,11 @@ class PiRpcClient:
         self.session_file = session_file
         self.model = model
         self.system_prompt = system_prompt
+        # Tool allowlist for the subprocess (pi --tools). None = pi defaults
+        # (read, bash, edit, write). The engine narrows this in test mode so
+        # the knowledge-base write boundary is enforced by the tool surface,
+        # not by model cooperation.
+        self.tools: tuple[str, ...] | None = None
         self.extra_arguments = tuple(extra_arguments)
         self.timeout_seconds = timeout_seconds
         self._process: asyncio.subprocess.Process | None = None
@@ -104,6 +109,8 @@ class PiRpcClient:
             arguments.extend(("--model", self.model))
         if self.system_prompt:
             arguments.extend(("--system-prompt", self.system_prompt))
+        if self.tools:
+            arguments.extend(("--tools", ",".join(self.tools)))
         arguments.extend(self.extra_arguments)
 
         logger.info("Starting Pi RPC process (session name: %s).", self.session_name)

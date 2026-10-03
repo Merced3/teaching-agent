@@ -1,6 +1,8 @@
 # Current State
 
-Last updated: 2026-10-01 night (turn-taking suite built: PTT finalize, hold-the-floor accumulation, "Mm." fillers, text gating, dual-mode remote PTT + phone /ptt page — 31 tests green, NONE live-verified: hub DAVE receive broke (RTP padding, root-caused, partial venv patch, residual opus `invalid argument`) — see decision-log 2026-10-01 night and the boundary note below).
+Last updated: 2026-10-02 (voice session: ran owed recall check #1, keyed-receipt trick. Result: FADED A 3RD TIME — learner recalled the two-part shape (write + receipt) but asserted retries should FAIL; re-presented the core point (retry gets the recorded SUCCESS, else dedup is pointless). Evidence level: recognized after re-presentation, ~2 weeks delay. Pattern holds: lookup detail (what the receipt is FOR) fades, mechanism shape survives. Remaining owed checks (2)(3)(4) + node-5 applied-grade still outstanding.)
+
+Prior: 2026-10-02 (session opened, no teaching: learner ended before recall checks ran — owed checks below are still outstanding, now at ~2 weeks delay and growing). Prior: 2026-10-01 night (turn-taking suite built: PTT finalize, hold-the-floor accumulation, "Mm." fillers, text gating, dual-mode remote PTT + phone /ptt page — 31 tests green, NONE live-verified: hub DAVE receive broke (RTP padding, root-caused, partial venv patch, residual opus `invalid argument`) — see decision-log 2026-10-01 night and the boundary note below).
 
 ## What exists
 
@@ -17,7 +19,7 @@ Last updated: 2026-10-01 night (turn-taking suite built: PTT finalize, hold-the-
 
 ## The next smallest milestone
 
-Deep-dive complete (2026-09-18). Next session: recall checks ~2026-09-21 (3-day interval): (1) keyed-receipt trick — 3rd attempt, switch to PRODUCTION rep (write the handler pseudocode cold, not verbal recall); (2) invariant / enforcement-at-write-boundary names; (3) idempotent-vs-retry-safe distinction; (4) crash-window general form (between 2 durable steps; duplication-vs-loss is chosen). Also owed: node-5 applied-grade via one no-scaffold transfer in a new domain (email send / CI deploy) — fold into the 09-21 checks. Then a learner decision: pick the next deep-dive from the map's remaining edge nodes, or consolidate with a small project using all five nodes. Retention pattern re-confirmed 2026-09-18: mechanisms stick, lookup details (keyed receipt's target) fade fastest — keyed receipt has faded twice at short intervals.
+Deep-dive complete (2026-09-18). Next session: recall checks (planned 2026-09-21; check #1 keyed-receipt ran 2026-10-02 and faded again — consider changing the rep: pseudocode written cold, or a concrete story anchoring the receipt's purpose. Still owed: — record results as level + actual elapsed time, ~2 weeks): (1) keyed-receipt trick — NOW 4th attempt after 10-02 fade, definitely switch to PRODUCTION rep (write the handler pseudocode cold, not verbal recall); (2) invariant / enforcement-at-write-boundary names; (3) idempotent-vs-retry-safe distinction; (4) crash-window general form (between 2 durable steps; duplication-vs-loss is chosen). Also owed: node-5 applied-grade via one no-scaffold transfer in a new domain (email send / CI deploy) — fold into the 09-21 checks. Then a learner decision: pick the next deep-dive from the map's remaining edge nodes, or consolidate with a small project using all five nodes. Retention pattern re-confirmed 2026-09-18: mechanisms stick, lookup details (keyed receipt's target) fade fastest — keyed receipt has faded twice at short intervals.
 
 ## Known risks / open decisions
 

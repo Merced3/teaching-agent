@@ -40,6 +40,7 @@ class Settings:
     pi_timeout_seconds: int
     recall_pings_enabled: bool
     text_require_address: bool
+    lesson_state_file: Path
     recall_check_interval_seconds: int
     voice_enabled: bool
     voice_autojoin: bool
@@ -99,6 +100,12 @@ class Settings:
         )
         text_require_address = _parse_bool(
             environment.get("TEACHING_AGENT_TEXT_REQUIRE_ADDRESS", "true")
+        )
+        lesson_state_file = Path(
+            environment.get(
+                "TEACHING_AGENT_LESSON_STATE_FILE", "data/lesson-state.json"
+            ).strip()
+            or "data/lesson-state.json"
         )
         recall_check_interval_seconds = _positive_int_with_default(
             environment, "TEACHING_AGENT_RECALL_CHECK_INTERVAL_SECONDS", default=3600
@@ -169,6 +176,7 @@ class Settings:
             pi_timeout_seconds=pi_timeout_seconds,
             recall_pings_enabled=recall_pings_enabled,
             text_require_address=text_require_address,
+            lesson_state_file=lesson_state_file,
             recall_check_interval_seconds=recall_check_interval_seconds,
             voice_enabled=voice_enabled,
             voice_autojoin=voice_autojoin,

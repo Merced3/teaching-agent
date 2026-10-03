@@ -14,10 +14,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from datetime import date
 from typing import Any
 
 from .config import Settings
 from .hub_client import HubClient, HubError
+from .lessons import LessonManager
 from .pi_rpc import PiRpcClient, PiRpcError
 from .voice.runtime import VoiceError, VoiceRuntime
 
@@ -45,6 +47,27 @@ _COMMANDS = [
                 "type": "string",
                 "required": True,
             }
+        ],
+    },
+    {
+        # Code-owned backstop for pi's [lesson: ...] directives: the model's
+        # boundary detection is probabilistic; this is the deterministic
+        # override. Same LessonManager, same thread/milestone effects.
+        "name": "lesson",
+        "description": "Lesson thread control: start/end the active lesson manually.",
+        "options": [
+            {
+                "name": "action",
+                "description": "start, end, or status",
+                "type": "string",
+                "required": True,
+            },
+            {
+                "name": "value",
+                "description": "topic (for start) or summary (for end)",
+                "type": "string",
+                "required": False,
+            },
         ],
     },
     {
@@ -94,6 +117,12 @@ _RECALL_TICK_PROMPT = (
     "one new word per sentence. If nothing is due, reply with exactly: SILENT"
 )
 
+# Test mode is a real boundary: pi runs with read-only tools, so the
+# knowledge base cannot be written no matter what the model decides.
+# (bash is excluded precisely because it can write.) The prompt text below
+# documents the intent; this allowlist enforces it.
+_TEST_MODE_TOOLS = ("read", "grep", "find", "ls")
+
 
 def build_system_prompt(settings: Settings, *, test_mode: bool) -> str:
     """The teacher's standing orders: the handoff protocol plus channel context."""
@@ -108,12 +137,33 @@ def build_system_prompt(settings: Settings, *, test_mode: bool) -> str:
         handoff.strip(),
         "",
         "Channel rules:",
+        "- Every message you receive starts with a [date: YYYY-MM-DD] prefix. "
+        "That is the real current date, computed fresh per message — trust it "
+        "over any date written in the docs, and use it whenever you record "
+        "dates or compute elapsed time.",
         "- The learner's messages arrive prefixed with context like "
         "'[thread: name]'. Reply as a teacher in conversation: plain language "
         "first, one idea at a time, short by default.",
         "- Your final assistant text each turn is posted verbatim to Discord. "
         "Never include internal notes in it.",
         "- Git-commit knowledge-base changes at session close.",
+        "- Lesson threads are how the channel stays clean: the main channel "
+        "is an index of evidence, transcripts and working-out are exhaust "
+        "that belongs in a thread. You control this with directive lines "
+        "placed anywhere in your reply; they are stripped before your reply "
+        "is posted or spoken, so the learner never sees them, and they cost "
+        "you nothing to include. The directives:",
+        "  [lesson: start | <topic>] — REQUIRED in the same reply where a "
+        "lesson topic is settled (the learner asks for a lesson, or you "
+        "agree together what to work on). Opens a thread named after the "
+        "topic; voice transcripts and the working record go there.",
+        "  [lesson: milestone | <what was learned, with evidence level>] — "
+        "post sparingly, only for a genuine evidence event mid-lesson.",
+        "  [lesson: end | <summary with evidence level>] — REQUIRED when a "
+        "lesson wraps up or the learner calls it done.",
+        "A recall-check chat without a lesson topic is not a lesson; no "
+        "directive needed. When in doubt between starting or not, start — "
+        "a stray closed thread is cheaper than a flooded main channel.",
     ]
     if test_mode:
         parts.extend(
@@ -143,6 +193,10 @@ class TeachingEngine:
         self._voice = voice
         self._test_mode = settings.test_mode
         self._last_voice_channel_id: int | None = None
+        self._pi.tools = _TEST_MODE_TOOLS if self._test_mode else None
+        self._lessons = LessonManager(
+            hub, settings.discord_channel_id, settings.lesson_state_file
+        )
 
     def set_voice(self, voice: VoiceRuntime) -> None:
         """Attach the voice layer post-construction: the runtime needs the
@@ -224,6 +278,9 @@ class TeachingEngine:
         if command == "mode":
             await self._handle_mode(payload)
             return True
+        if command == "lesson":
+            await self._handle_lesson(payload)
+            return True
         if command == "voice":
             await self._handle_voice_command(payload)
             return True
@@ -261,13 +318,50 @@ class TeachingEngine:
             return
         self._test_mode = want_test
         self._pi.system_prompt = build_system_prompt(self._settings, test_mode=want_test)
+        self._pi.tools = _TEST_MODE_TOOLS if want_test else None
         await self._pi.close()
         logger.info("Test mode toggled: %s", want_test)
         note = (
-            "TEST MODE ON — I won't write to the knowledge base."
+            "TEST MODE ON — knowledge-base writes are off (I have no write tools)."
             if want_test
             else "LIVE MODE — session close will write to the knowledge base and commit."
         )
+        await self._hub.post_followup(interaction_id, note, ephemeral=False)
+
+    async def _handle_lesson(self, payload: dict[str, Any]) -> None:
+        """Deterministic lesson-thread control — same code-owned category as
+        /mode: boundaries the learner can force when the model doesn't fire."""
+        interaction_id = str(payload.get("interaction_id"))
+        options = payload.get("options") or {}
+        action = str(options.get("action") or "").strip().lower()
+        value = str(options.get("value") or "").strip()
+
+        try:
+            if action == "start":
+                if not value:
+                    await self._hub.post_followup(
+                        interaction_id,
+                        "Usage: /lesson action:start value:<topic>",
+                        ephemeral=True,
+                    )
+                    return
+                note = await self._lessons.start(value)
+            elif action == "end":
+                note = await self._lessons.end(value)
+            elif action == "status":
+                note = self._lessons.describe()
+            else:
+                await self._hub.post_followup(
+                    interaction_id,
+                    "Actions: start <topic>, end [summary], status",
+                    ephemeral=True,
+                )
+                return
+        except HubError as exc:
+            await self._hub.post_followup(
+                interaction_id, f"Lesson command failed: {exc}", ephemeral=True
+            )
+            return
         await self._hub.post_followup(interaction_id, note, ephemeral=False)
 
     async def _handle_voice_state(self, payload: dict[str, Any]) -> None:
@@ -354,10 +448,11 @@ class TeachingEngine:
             await say(f"Voice command failed: {exc}", ephemeral=True)
 
     async def post_voice_transcript(self, learner_text: str, reply: str) -> None:
-        """Keep the text channel as the record of spoken exchanges."""
+        """Record spoken exchanges — in the active lesson thread when one is
+        open, otherwise in the main channel."""
         try:
             await self._hub.post_message(
-                self._settings.discord_channel_id,
+                self._lessons.thread_id or self._settings.discord_channel_id,
                 f"🎙 **You:** {learner_text}\n**{self._settings.agent_name}:** {reply}",
             )
         except HubError:
@@ -381,7 +476,7 @@ class TeachingEngine:
         except HubError:
             logger.debug("Typing indicator failed; continuing.", exc_info=True)
         try:
-            result = await self._pi.prompt(prompt)
+            result = await self._pi.prompt(f"[date: {date.today().isoformat()}] {prompt}")
         except PiRpcError as exc:
             logger.exception("Pi run failed.")
             return f"(teacher brain hiccuped: {exc})"
@@ -389,4 +484,6 @@ class TeachingEngine:
             "Pi run: model=%s/%s cost=$%.4f",
             result.provider, result.model_id, result.cost,
         )
-        return result.text
+        # Lesson directives are honored everywhere pi speaks (chat, commands,
+        # voice); the learner never sees the marker lines.
+        return await self._lessons.process(result.text)
