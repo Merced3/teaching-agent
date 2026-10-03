@@ -49,8 +49,8 @@ def build_engine(settings: Settings) -> TeachingEngine:
                 settings,
                 hub,
                 ask_pi=engine.ask_pi,
-                post_transcript=(
-                    engine.post_voice_transcript
+                transcript=(
+                    engine.transcript_sink()
                     if settings.voice_post_transcript
                     else None
                 ),

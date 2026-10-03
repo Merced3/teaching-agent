@@ -21,6 +21,7 @@ from .config import Settings
 from .hub_client import HubClient, HubError
 from .lessons import LessonManager
 from .pi_rpc import PiRpcClient, PiRpcError
+from .voice.conversation import TranscriptSink
 from .voice.runtime import VoiceError, VoiceRuntime
 
 logger = logging.getLogger(__name__)
@@ -447,13 +448,44 @@ class TeachingEngine:
         except (VoiceError, PiRpcError, HubError, ValueError) as exc:
             await say(f"Voice command failed: {exc}", ephemeral=True)
 
-    async def post_voice_transcript(self, learner_text: str, reply: str) -> None:
-        """Record spoken exchanges — in the active lesson thread when one is
-        open, otherwise in the main channel."""
+    async def post_voice_learner(self, learner_text: str) -> None:
+        """The learner's words, posted the moment a turn fires — the record
+        exists even if the turn is interrupted before any answer."""
+        await self._post_transcript_line(f"🎙 **You:** {learner_text}")
+
+    async def post_voice_reply(self, reply: str, heard_seconds: float | None) -> None:
+        """The agent's reply after it is spoken. A barge-in adds where the
+        learner cut it off, so the log shows what was never heard."""
+        text = f"🎙 **{self._settings.agent_name}:** {reply}"
+        if heard_seconds is not None:
+            text += (
+                f"\n*(✂️ cut off — you interrupted ~{heard_seconds:.0f}s in; "
+                "the text above is the full reply)*"
+            )
+        await self._post_transcript_line(text)
+
+    async def post_voice_unanswered(self, learner_text: str) -> None:
+        """The learner interrupted before the agent answered — the log must
+        not pretend that turn was processed."""
+        await self._post_transcript_line(
+            f"*(⚠️ interrupted — {self._settings.agent_name} never answered that one)*"
+        )
+
+    def transcript_sink(self) -> TranscriptSink:
+        """The voice layer's auditable-log callbacks, bound to this engine."""
+        return TranscriptSink(
+            learner=self.post_voice_learner,
+            reply=self.post_voice_reply,
+            unanswered=self.post_voice_unanswered,
+        )
+
+    async def _post_transcript_line(self, text: str) -> None:
+        """Transcripts go to the active lesson thread when one is open,
+        otherwise the main channel."""
         try:
             await self._hub.post_message(
                 self._lessons.thread_id or self._settings.discord_channel_id,
-                f"🎙 **You:** {learner_text}\n**{self._settings.agent_name}:** {reply}",
+                text,
             )
         except HubError:
             logger.debug("Transcript post failed; continuing.", exc_info=True)

@@ -165,12 +165,12 @@ async def test_transcripts_go_to_active_lesson_thread(tmp_path) -> None:
     pi.prompt.return_value = pi_reply("[lesson: start | State machines]\nBegin.")
     await engine.dispatch(message("Alvar, go"))
     hub.post_message.reset_mock()
-    await engine.post_voice_transcript("why does CLOSING exist?", "crash witness")
+    await engine.post_voice_learner("why does CLOSING exist?")
     target = hub.post_message.await_args.args[0]
     assert target == 777
     # No active lesson → main channel.
     engine._lessons._thread_id = None  # noqa: SLF001
-    await engine.post_voice_transcript("a", "b")
+    await engine.post_voice_learner("a")
     assert hub.post_message.await_args.args[0] == 100
 
 
@@ -193,7 +193,7 @@ async def test_active_lesson_survives_restart(tmp_path) -> None:
     state_file = tmp_path / "state.json"
     state_file.write_text('{"thread_id": 777, "topic": "State machines"}')
     engine, hub, _ = make_engine({"TEACHING_AGENT_LESSON_STATE_FILE": str(state_file)})
-    await engine.post_voice_transcript("a", "b")
+    await engine.post_voice_learner("a")
     assert hub.post_message.await_args.args[0] == 777
 
 
@@ -248,7 +248,7 @@ async def test_lesson_command_start_binds_thread(tmp_path) -> None:
     hub.create_thread.assert_awaited_once_with(100, "Races")
     assert engine._lessons.thread_id == 888  # noqa: SLF001
     # Voice transcripts now land in the thread.
-    await engine.post_voice_transcript("a", "b")
+    await engine.post_voice_learner("a")
     assert hub.post_message.await_args.args[0] == 888
 
 

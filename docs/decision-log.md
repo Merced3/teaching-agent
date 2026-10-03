@@ -366,3 +366,10 @@ Verdict: keep.
 - **Also this session:** corrected tonight's current-state.md dates (2026-10-08 → 2026-10-02; "~3.5 weeks" → "~2 weeks"); the remaining 2026-10-08 label in "What exists" is a historical entry from the mixed-dating period, left as-is.
 - **Evidence:** 48 tests green (4 new: command start binds thread + transcripts route, end clears + milestone, start requires topic, status reports); ruff clean on touched files.
 - **Verdict:** built, awaiting live verification.
+
+## 2026-10-02 (night) — Voice transcript becomes an auditable log (learner's field notes)
+
+- **Evidence (learner's notes from the first threaded lesson):** (1) the merged 🎙 "You + Alvar" transcript message risks Discord's character limit and conflates two events; (2) a press-release-press-again sequence LOST the first message from the log entirely — log reconstruction (turns 18→20, 23:55): the first turn fired, learner pressed again 2s in, barge-in cancelled it mid-think, and since transcripts only posted on completed replies, the learner's words vanished from the record while the second turn logged fine. The log lied by omission.
+- **What was built:** the transcript seam is now three message types (TranscriptSink) instead of one merged post: (1) the learner's words post the moment a turn fires — standalone message, character limit solved, interrupted turns still on record; (2) the reply posts after it is spoken, with `*(✂️ cut off — you interrupted ~Ns in)*` when barged in (heard-seconds tracked from PCM frames sent minus the pacing lead), so the log shows what was never heard; (3) a turn interrupted before the agent answers gets `*(⚠️ interrupted — Alvar never answered that one)*`. All three honor the lesson-thread routing. Transcript stays conversation-agnostic: it reports what was said and what was processed, nothing about ordering policy.
+- **Evidence:** 51 tests green (3 new: words post before reply, interrupted-while-thinking posts unanswered, barge-in marks the cut-off point); ruff clean on touched files.
+- **Verdict:** built, awaiting live verification on the next voice lesson.

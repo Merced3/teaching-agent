@@ -25,6 +25,7 @@ import contextlib
 import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 import websockets
@@ -42,7 +43,23 @@ _FRAME_SECONDS = 0.020
 _MAX_LEAD_SECONDS = 0.300  # stay this far ahead of playback (bounds barge-in lag)
 
 AskPi = Callable[[str], Awaitable[str | None]]
-PostTranscript = Callable[[str, str], Awaitable[None]]
+
+# The transcript is an auditable log of what actually happened, not a
+# merged summary: the learner's words post the moment a turn fires (so a
+# turn that gets interrupted still appears), the reply posts after it is
+# spoken (with a cut-off marker if the learner barged in), and a turn the
+# learner interrupted before the agent answered gets an explicit
+# "unanswered" note. Three small messages, no character-limit squeeze.
+OnLearner = Callable[[str], Awaitable[None]]
+OnReply = Callable[[str, float | None], Awaitable[None]]  # seconds heard; None = full
+OnUnanswered = Callable[[str], Awaitable[None]]
+
+
+@dataclass(frozen=True)
+class TranscriptSink:
+    learner: OnLearner
+    reply: OnReply
+    unanswered: OnUnanswered
 
 _FILLER_DELAY_SECONDS = 2.0  # pi silence this long -> first "Mm."
 _FILLER_INTERVAL_SECONDS = 3.0  # then repeat (rotating clips) until pi answers
@@ -68,7 +85,7 @@ class VoiceConversation:
         stt: STTProvider,
         tts: TTSProvider,
         ask_pi: AskPi,
-        post_transcript: PostTranscript | None = None,
+        transcript: TranscriptSink | None = None,
         filler_dir: Path | None = None,
         remote_ptt: RemotePTT | None = None,
     ) -> None:
@@ -77,7 +94,7 @@ class VoiceConversation:
         self._stt = stt
         self._tts = tts
         self._ask_pi = ask_pi
-        self._post_transcript = post_transcript
+        self._transcript = transcript
         self._filler_dir = filler_dir
         self._filler_clips: list[bytes] | None = None  # lazy: loaded on first use
         self._remote_ptt = remote_ptt
@@ -284,13 +301,30 @@ class VoiceConversation:
 
     async def _run_turn(self, generation: int, learner_text: str) -> None:
         logger.info("Voice turn %d — learner: %s", generation, learner_text)
+        sink = self._transcript
+        if sink is not None:
+            await sink.learner(learner_text)
         try:
-            reply = await self._ask_with_fillers(generation, learner_text)
+            try:
+                reply = await self._ask_with_fillers(generation, learner_text)
+            except asyncio.CancelledError:
+                if sink is not None:
+                    await sink.unanswered(learner_text)
+                raise
             if generation != self._generation or not reply:
+                if sink is not None:
+                    await sink.unanswered(learner_text)
                 return
-            await self._speak(generation, reply)
-            if generation == self._generation and self._post_transcript is not None:
-                await self._post_transcript(learner_text, reply)
+            heard_box = [0.0]  # seconds of reply audio actually played
+            try:
+                await self._speak(generation, reply, heard_box)
+            except asyncio.CancelledError:
+                if sink is not None:
+                    await sink.reply(reply, heard_box[0])
+                raise
+            heard = None if generation == self._generation else heard_box[0]
+            if sink is not None:
+                await sink.reply(reply, heard)
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -329,8 +363,21 @@ class VoiceConversation:
 
         await self._stream_pcm(generation, chunks())
 
-    async def _speak(self, generation: int, text: str) -> None:
-        await self._stream_pcm(generation, self._tts.stream_hub_pcm(text))
+    async def _speak(self, generation: int, text: str, heard_box: list[float]) -> None:
+        """Speak a reply, continuously updating heard_box[0] with roughly how
+        many seconds the learner has actually heard (audio sent, minus the
+        pacing lead) — so a barge-in can be logged with its cut-off point."""
+        sent = 0
+
+        async def counted() -> AsyncIterator[bytes]:
+            nonlocal sent
+            async for chunk in self._tts.stream_hub_pcm(text):
+                sent += len(chunk)
+                seconds = sent / (_FRAME_BYTES / _FRAME_SECONDS) - _MAX_LEAD_SECONDS
+                heard_box[0] = max(0.0, seconds)
+                yield chunk
+
+        await self._stream_pcm(generation, counted())
 
     async def _stream_pcm(self, generation: int, chunks: AsyncIterator[bytes]) -> None:
         """Stream hub-format PCM into the hub, paced ~300 ms ahead of

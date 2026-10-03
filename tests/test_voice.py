@@ -459,3 +459,89 @@ async def test_stt_finalize_pending_fires_on_next_final_without_speech_final() -
     stt.on_utterance = heard.append
     await stt._consume([])
     assert heard == ["what is recursion"]
+
+
+# -- voice transcript: an auditable log of what actually happened ------------
+
+from teaching_agent.voice.conversation import TranscriptSink  # noqa: E402
+
+
+def make_sink_conversation(ask_pi):
+    sink = TranscriptSink(learner=AsyncMock(), reply=AsyncMock(), unanswered=AsyncMock())
+    tts = AsyncMock()
+    conv = VoiceConversation(
+        transport=SimpleNamespace(
+            speaker_id="42", requires_channel=False,
+            stream_url=lambda owner: "ws://x",
+            join=AsyncMock(), leave=AsyncMock(),
+        ),
+        owner="o",
+        stt=AsyncMock(),
+        tts=tts,
+        ask_pi=ask_pi,
+        transcript=sink,
+    )
+    return conv, sink, tts
+
+
+async def test_learner_words_post_before_the_reply() -> None:
+    async def ask(text: str) -> str:
+        return "a reply"
+
+    conv, sink, _ = make_sink_conversation(ask)
+    await conv._run_turn(conv._generation, "my question")  # noqa: SLF001
+    sink.learner.assert_awaited_once_with("my question")
+    sink.reply.assert_awaited_once_with("a reply", None)  # None = heard in full
+    sink.unanswered.assert_not_awaited()
+
+
+async def test_interrupted_while_thinking_posts_unanswered() -> None:
+    import asyncio
+
+    async def ask(text: str) -> str:
+        await asyncio.Event().wait()  # thinks forever
+        return "never"
+
+    conv, sink, _ = make_sink_conversation(ask)
+    task = asyncio.create_task(conv._run_turn(conv._generation, "lost words"))  # noqa: SLF001
+    await asyncio.sleep(0.05)
+    task.cancel()
+    import contextlib
+
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+    sink.learner.assert_awaited_once_with("lost words")  # words still on record
+    sink.unanswered.assert_awaited_once_with("lost words")
+    sink.reply.assert_not_awaited()
+
+
+async def test_barge_in_marks_where_the_reply_was_cut() -> None:
+    import asyncio
+    import contextlib
+
+    async def ask(text: str) -> str:
+        return "a long reply"
+
+    conv, sink, tts = make_sink_conversation(ask)
+
+    async def slow_chunks(text: str):
+        yield b"\x00" * 3840 * 50  # one second of audio
+        await asyncio.Event().wait()  # then endless generation
+        yield b""
+
+    tts.stream_hub_pcm = slow_chunks
+
+    class FakeWS:
+        async def send(self, frame: bytes) -> None:
+            pass
+
+    conv._ws = FakeWS()  # noqa: SLF001
+    task = asyncio.create_task(conv._run_turn(conv._generation, "hi"))  # noqa: SLF001
+    await asyncio.sleep(0.5)  # pacing lead makes it crawl through the audio
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+    sink.reply.assert_awaited_once()
+    reply_text, heard = sink.reply.await_args.args
+    assert reply_text == "a long reply"
+    assert heard is not None and heard >= 0.0  # cut-off point, not "full"

@@ -13,7 +13,7 @@ import logging
 from typing import Any
 
 from ..config import Settings
-from .conversation import AskPi, PostTranscript, VoiceConversation
+from .conversation import AskPi, TranscriptSink, VoiceConversation
 from .ptt import RemotePTT
 from .stt import STT_PROVIDERS, DeepgramSTT, STTProvider
 from .transport import BridgeTransport, DiscordTransport, VoiceTransport
@@ -32,12 +32,12 @@ class VoiceRuntime:
         settings: Settings,
         hub: Any,
         ask_pi: AskPi,
-        post_transcript: PostTranscript | None = None,
+        transcript: TranscriptSink | None = None,
         remote_ptt: RemotePTT | None = None,
     ) -> None:
         self._settings = settings
         self._ask_pi = ask_pi
-        self._post_transcript = post_transcript
+        self._transcript = transcript
         self._owner = settings.callback_url
         self._transport = self._make_transport(settings, hub)
         self._stt_name = settings.voice_stt_provider
@@ -102,7 +102,7 @@ class VoiceRuntime:
                 stt=self._make_stt(),
                 tts=self._make_tts(),
                 ask_pi=self._ask_pi,
-                post_transcript=self._post_transcript,
+                transcript=self._transcript,
                 filler_dir=self._settings.voice_filler_dir,
                 remote_ptt=self._remote_ptt,
             )
