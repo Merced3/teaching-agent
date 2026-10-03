@@ -105,6 +105,10 @@ class VoiceConversation:
         self._flush_task: asyncio.Task[None] | None = None
         self._learner_speaking = False
         self._pending_utterances: list[str] = []
+        # Interrupted turns the agent never answered, kept as context for the
+        # next turn: the learner's words are never silently dropped from what
+        # pi sees, even when the turn that carried them died.
+        self._shelved: list[str] = []
         self._generation = 0
         self.channel_id: int | None = None
 
@@ -304,17 +308,30 @@ class VoiceConversation:
         sink = self._transcript
         if sink is not None:
             await sink.learner(learner_text)
+        # Package any shelved (previously unanswered) messages ahead of this
+        # one — order preserved, depth unbounded; the transcript has already
+        # logged each part separately, this is only about what pi SEES.
+        prompt_text = learner_text
+        if self._shelved:
+            parts = "; ".join(f"({i}) {s}" for i, s in enumerate(self._shelved, 1))
+            prompt_text = (
+                f"[earlier message(s) the learner sent but you never answered, "
+                f"oldest first: {parts}] [current message: {learner_text}]"
+            )
         try:
             try:
-                reply = await self._ask_with_fillers(generation, learner_text)
+                reply = await self._ask_with_fillers(generation, prompt_text)
             except asyncio.CancelledError:
+                self._shelved.append(learner_text)
                 if sink is not None:
                     await sink.unanswered(learner_text)
                 raise
             if generation != self._generation or not reply:
+                self._shelved.append(learner_text)
                 if sink is not None:
                     await sink.unanswered(learner_text)
                 return
+            self._shelved.clear()  # answered: the shelf is discharged
             heard_box = [0.0]  # seconds of reply audio actually played
             try:
                 await self._speak(generation, reply, heard_box)

@@ -545,3 +545,39 @@ async def test_barge_in_marks_where_the_reply_was_cut() -> None:
     reply_text, heard = sink.reply.await_args.args
     assert reply_text == "a long reply"
     assert heard is not None and heard >= 0.0  # cut-off point, not "full"
+
+
+async def test_unanswered_words_are_shelved_into_the_next_turn() -> None:
+    """Interrupted words are never dropped from what pi sees: they ride
+    along with the next turn, oldest first, any depth."""
+    import asyncio
+    import contextlib
+
+    asked: list[str] = []
+
+    async def ask(text: str) -> str:
+        asked.append(text)
+        if len(asked) <= 2:
+            await asyncio.Event().wait()  # first two turns: think forever, die
+        return "reply"
+
+    conv, sink, _ = make_sink_conversation(ask)
+    first = asyncio.create_task(conv._run_turn(conv._generation, "first part"))  # noqa: SLF001
+    await asyncio.sleep(0.05)
+    first.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await first
+    # second interruption stacks (shelf depth 2)
+    second = asyncio.create_task(conv._run_turn(conv._generation, "second part"))  # noqa: SLF001
+    await asyncio.sleep(0.05)
+    second.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await second
+    await conv._run_turn(conv._generation, "third part")  # noqa: SLF001
+    assert len(asked) == 3
+    packaged = asked[2]
+    assert "(1) first part" in packaged and "(2) second part" in packaged
+    assert "[current message: third part]" in packaged
+    # shelf discharged after the answer
+    assert conv._shelved == []  # noqa: SLF001
+    sink.reply.assert_awaited_once_with("reply", None)
