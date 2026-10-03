@@ -485,7 +485,7 @@ class TeachingEngine:
         """The learner interrupted before the agent answered — the log must
         not pretend that turn was processed."""
         await self._post_transcript_line(
-            f"*(⚠️ interrupted — {self._settings.agent_name} never answered that one)*"
+            "*(⚠️ interrupted — not answered; shelved into your next message)*"
         )
 
     def transcript_sink(self) -> TranscriptSink:

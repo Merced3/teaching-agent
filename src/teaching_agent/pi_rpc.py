@@ -95,7 +95,7 @@ class PiRpcClient:
 
         self.session_directory.mkdir(parents=True, exist_ok=True)
         arguments = [
-            executable,
+            *self._resolve_launcher(executable),
             "--mode",
             "rpc",
             "--session-dir",
@@ -113,7 +113,10 @@ class PiRpcClient:
             arguments.extend(("--tools", ",".join(self.tools)))
         arguments.extend(self.extra_arguments)
 
-        logger.info("Starting Pi RPC process (session name: %s).", self.session_name)
+        logger.info(
+            "Starting Pi RPC process (session name: %s, tools=%s, extra=%s).",
+            self.session_name, self.tools, self.extra_arguments,
+        )
         try:
             self._process = await asyncio.create_subprocess_exec(
                 *arguments,
@@ -135,6 +138,31 @@ class PiRpcClient:
         except Exception:
             await self.close()
             raise
+
+    @staticmethod
+    def _resolve_launcher(executable: str) -> list[str]:
+        """On Windows, `pi` resolves to a pi.CMD batch shim, and batch `%*`
+        forwarding destroys multi-line argument values: the system prompt is
+        multi-line, so every argument after `--system-prompt` (--tools,
+        --extension) was silently cut (probe.txt leak, 2026-10-03). Bypass
+        the shim: invoke node on the bundled cli.js directly."""
+        if sys.platform == "win32" and executable.lower().endswith((".cmd", ".bat")):
+            cli_js = (
+                Path(executable).parent
+                / "node_modules"
+                / "@earendil-works"
+                / "pi-coding-agent"
+                / "dist"
+                / "bundle"
+                / "cli.js"
+            )
+            node = shutil.which("node")
+            if node is not None and cli_js.is_file():
+                return [node, str(cli_js)]
+            # Shim found but layout unknown: keep the shim rather than fail
+            # to launch; main.py's fail-closed extension check keeps any
+            # resulting boundary loss visible.
+        return [executable]
 
     async def close(self) -> None:
         process = self._process

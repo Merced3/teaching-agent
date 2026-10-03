@@ -14,7 +14,7 @@ import uvicorn
 from automation_harness import Harness, HarnessConfig, ServiceContext
 
 from .callback_server import create_callback_app
-from .config import Settings
+from .config import ConfigurationError, Settings
 from .engine import TeachingEngine, build_system_prompt
 from .hub_client import HubClient
 from .pi_rpc import PiRpcClient
@@ -28,11 +28,16 @@ def build_engine(settings: Settings) -> TeachingEngine:
     hub = HubClient(settings.hub_url)
     # The teacher teaches, it does not build: a pi extension physically
     # blocks write/edit outside the knowledge base and limits bash to
-    # read-only commands + git (decision log 2026-10-02).
+    # read-only commands + git (decision log 2026-10-02). Fail CLOSED: if
+    # the extension is missing, the agent does not start — a silent skip
+    # once let a src/ write through (probe.txt, 2026-10-03).
     extension = settings.knowledge_root / "tools" / "knowledge-only-writes.ts"
-    extra_arguments = (
-        ("--extension", str(extension)) if extension.is_file() else ()
-    )
+    if not extension.is_file():
+        raise ConfigurationError(
+            f"Required pi extension missing: {extension} "
+            "(write-boundary enforcement; refusing to start without it)"
+        )
+    extra_arguments = ("--extension", str(extension))
     pi = PiRpcClient(
         executable=settings.pi_executable,
         working_directory=settings.knowledge_root,
