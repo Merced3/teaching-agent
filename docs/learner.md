@@ -28,6 +28,8 @@ Everything here is a **hypothesis about one specific mind**, to be confirmed or 
 | Learning must fit around work/cleaning/exercise; dedicated desk time feels high-cost | confirmed | stated 2026-08-26; motivation for audio + async channels |
 | Learns best when anchored to things he built himself | hypothesis | requested project-anchored teaching; untested until first loop |
 | Loses the goal/thread in long sessions; needs periodic re-anchoring, not just session-start context | observed | first loop, 2026-08-26: forgot the loop's purpose mid-probe |
+| Needs EXPLICIT verdicts — right/wrong per part, stated first — or the feedback loop isn't felt even when it exists | confirmed | stated 2026-10-04: "I haven't felt a feedback loop... respond with whether I got something wrong or the ways I got it correct"; verdict-card format adopted same day (decision-log 2026-10-04) |
+| Frames learning as training ("bodybuilding of the mind"); wants visible progress metrics | confirmed | stated 2026-10-04; gym analogy recurs (cf. consistency-over-optimality, 2026-08-26) |
 | Wants synchronous voice conversation as a modality (walk/sauna: interrupt, ask, debate) | confirmed | stated 2026-08-26; motivated by wanting to interrupt the passive audio lesson mid-listen |
 | Software books go "in one ear and out the other" | confirmed | self-report 2026-08-26; corroborates H1 pattern beyond audio |
 | Retention without retrieval practice is weak — first system measurement: 0/5 presented-only concepts survived 5 days unaided | observed | 2026-08-31 recall check; partial shapes retained (scope of crash window) but mechanisms lost; consistent with H1, n=1 |

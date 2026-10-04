@@ -411,3 +411,11 @@ Verdict: keep.
 - **Fix:** env-var escape hatch added to bash-guard (`PI_BASH_GUARD_AUTO_ALLOW=1` skips prompting entirely; inert unless set, so interactive sessions are unchanged) + the agent's pi subprocess launches with that env var set. The teaching-agent's knowledge-only-writes extension is the destructive-floor there (bash is allowlisted to read-only+git anyway). Note: bash-guard lives OUTSIDE the repo (~/.pi) — its change isn't versioned here; back it up or it won't survive a fresh machine.
 - **Evidence:** live probe through the exact agent launch path (node cli.js, RPC mode, extension, env var): `git log` executed clean (isError false). 53 tests green.
 - **Verdict:** keep. Boundaries on this machine now: prompt rules (advisory) → knowledge-only-writes (path floor) → bash-guard (interactive floor for the human's own sessions). Mode semantics the learner settled: test = nothing persists (physically); live = Alvar writes + commits his notebook. Default is now live.
+
+## 2026-10-04 — Verdict-first feedback: learner reported no felt feedback loop
+
+- **Report (learner's words):** "I haven't felt a feedback loop... I don't get any feedback on it. Idk or feel like I'm getting better — could you respond with whether I got something wrong or the ways I got it correct?" Framing: "the bodybuilding of the mind."
+- **Diagnosis:** verdicts were buried mid-paragraph; the learner had to dig to learn if they were right. Evidence was being recorded but not *felt*.
+- **Change (permanent):** every learner answer now gets a VERDICT CARD first — ✅/❌ per part, what was right, what was missing/wrong, one line each — before any explanation. Explanation follows only for wrong/fuzzy parts. Verdict first, teaching second.
+- **Also adopted:** bodybuilding mapping as the working frame — progressive overload (edge-only), reps with increasing rest (delayed recall), form feedback (verdict card), tracked lifts (evidence levels). Planned addition: a visible per-concept scoreboard in current-state.md (last result, delay survived, next rep due), surfaced on /status.
+- **Status:** learner explicitly approved ("verdict card is a great idea... log it / commit"). Verdict: keep; evaluate after the next few recall checks whether the loop is now *felt*.
