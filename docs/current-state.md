@@ -1,6 +1,10 @@
 # Current State
 
-Last updated: 2026-10-05 (/lecture feature built: code-owned podcast-lecture episodes — pi authors markdown into lessons/, code renders + serves the audio link, episode recorded UNPROBED for later recall. 61 tests green; live verification in the 🧪 LAB channels is the next step.)
+Last updated: 2026-10-05 (later: lecture episode generated, UNPROBED — `lessons/crash-window-general-form/lecture.md`: crash window as space between two DURABLE steps, the forced duplication-vs-loss choice, learner's own socratic-partner reasoning as transfer proof, two drills for auditing unfamiliar systems).
+
+Prior: 2026-10-05 (later: lecture episode generated, UNPROBED — `lessons/keyed-receipt-trick/lecture.md`: targets the 4x-faded detail — the receipt stores the RESULT and the retry must return it; why skip-silently and fail-loudly both break the trick; receipt in own durable store, atomic with the send).
+
+Prior: 2026-10-05 (/lecture feature built: code-owned podcast-lecture episodes — pi authors markdown into lessons/, code renders + serves the audio link, episode recorded UNPROBED for later recall. 61 tests green; live verification in the 🧪 LAB channels is the next step.)
 
 Prior: 2026-10-03 (later same day: node-5 TRANSFER task, email-send/timeout scenario, no scaffold. Result: TRANSFERRED — learner applied keyed receipt cold: on retry read the receipt, if present don't resend, report the recorded result. Two fuzz points corrected: receipt lives in YOUR OWN durable store, atomically with the send attempt, not at the provider (unwelded outside world); learner also asked what 'write boundary' means — re-explained plainly (the set of code paths that change state; enforce on every one). Also today: learner asked 'did I get those right' — answered plainly (keyed receipt yes, invariant names no), then re-presented invariant + write-boundary for READING (presented-only, re-test owed later). RECALL CYCLE COMPLETE: crash-window ok, keyed-receipt ok (production rep), retry-safe distinction faded once (re-presented), invariant names faded x3 (re-presented, re-test owed), node-5 transfer ok. Next: learner decision — next deep-dive from map edge nodes, or consolidation project using all five.)
 
