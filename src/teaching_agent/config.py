@@ -42,6 +42,8 @@ class Settings:
     text_require_address: bool
     lesson_state_file: Path
     recall_check_interval_seconds: int
+    lecture_public_url: str
+    lecture_tts: str
     voice_enabled: bool
     voice_autojoin: bool
     voice_transport: str
@@ -110,6 +112,21 @@ class Settings:
         recall_check_interval_seconds = _positive_int_with_default(
             environment, "TEACHING_AGENT_RECALL_CHECK_INTERVAL_SECONDS", default=3600
         )
+        # Where generated lecture audio is linked from. The file is served by
+        # this agent's own callback server; the default only works on this
+        # machine — set the LAN/Tailscale URL for phone listening.
+        lecture_public_url = environment.get(
+            "TEACHING_AGENT_LECTURE_PUBLIC_URL", ""
+        ).strip()
+        if not lecture_public_url:
+            lecture_public_url = f"http://{callback_host}:{callback_port}"
+        lecture_tts = environment.get(
+            "TEACHING_AGENT_LECTURE_TTS", "elevenlabs"
+        ).strip()
+        if lecture_tts not in ("elevenlabs", "edge"):
+            raise ConfigurationError(
+                "TEACHING_AGENT_LECTURE_TTS must be 'elevenlabs' or 'edge'."
+            )
         voice_enabled = _parse_bool(environment.get("TEACHING_AGENT_VOICE_ENABLED", "false"))
         voice_autojoin = _parse_bool(
             environment.get("TEACHING_AGENT_VOICE_AUTOJOIN", "true")
@@ -178,6 +195,8 @@ class Settings:
             text_require_address=text_require_address,
             lesson_state_file=lesson_state_file,
             recall_check_interval_seconds=recall_check_interval_seconds,
+            lecture_public_url=lecture_public_url,
+            lecture_tts=lecture_tts,
             voice_enabled=voice_enabled,
             voice_autojoin=voice_autojoin,
             voice_transport=voice_transport,

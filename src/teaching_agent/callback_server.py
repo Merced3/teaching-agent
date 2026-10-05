@@ -9,10 +9,11 @@ For messages, any 2xx acknowledges delivery.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from .voice.ptt import RemotePTT
 
@@ -64,6 +65,7 @@ def create_callback_app(
     *,
     remote_ptt: RemotePTT | None = None,
     ptt_token: str = "",
+    lectures_dir: Path | None = None,
 ) -> FastAPI:
     app = FastAPI(title="teaching-agent-callback")
 
@@ -83,6 +85,19 @@ def create_callback_app(
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    if lectures_dir is not None:
+        # /lecture episodes are served as links, not Discord uploads: the
+        # learner listens on the phone over LAN/Tailscale, and long
+        # episodes would brush Discord's free upload cap anyway.
+        root = lectures_dir.resolve()
+
+        @app.get("/lectures/{path:path}")
+        async def lecture_file(path: str) -> Response:
+            candidate = (root / path).resolve()
+            if not candidate.is_relative_to(root) or not candidate.is_file():
+                return Response(status_code=404)
+            return FileResponse(candidate)
 
     if remote_ptt is not None:
 

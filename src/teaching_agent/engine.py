@@ -14,11 +14,18 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from contextlib import suppress
 from datetime import date
 from typing import Any
 
 from .config import Settings
 from .hub_client import HubClient, HubError
+from .lectures import (
+    LectureError,
+    render_lecture_audio,
+    resolve_lesson_file,
+    split_directive,
+)
 from .lessons import LessonManager
 from .pi_rpc import PiRpcClient, PiRpcError
 from .voice.conversation import TranscriptSink
@@ -76,6 +83,22 @@ _COMMANDS = [
         ],
     },
     {
+        # Code-owned like /mode and /lesson: generating audio is a build
+        # action, and pi's tools deliberately exclude building. Pi writes
+        # the markdown (knowledge-base authoring), the code renders and
+        # serves it, and the link goes to the channel.
+        "name": "lecture",
+        "description": "Generate a podcast-lecture audio episode on a topic (link posted here).",
+        "options": [
+            {
+                "name": "topic",
+                "description": "what the episode should teach (paste from /next if you like)",
+                "type": "string",
+                "required": True,
+            }
+        ],
+    },
+    {
         "name": "voice",
         "description": "Voice session control and live provider/model swapping.",
         "options": [
@@ -130,6 +153,27 @@ _RECALL_TICK_PROMPT = (
     "sentence on what comes next after it. If nothing is due, reply with exactly: SILENT"
 )
 
+_LECTURE_WRITE_PROMPT = (
+    "The learner ran /lecture topic:{topic}. Write a spoken-word podcast "
+    "lecture on that topic as audio-friendly markdown (no code blocks, no "
+    "tables, no visual-only markup — it will be read aloud by TTS). Ground "
+    "it in what the maps in maps/ and docs/current-state.md say about what "
+    "the learner knows and where the edge is; teach to the edge, don't "
+    "re-present what is already known. Aim for dense, not long. Save it as "
+    "lessons/<slug>/lecture.md (one folder per topic, slug = short "
+    "kebab-case name). Then reply in chat with 2-3 sentences about what the "
+    "episode covers, and end your reply with a directive line exactly like: "
+    "[lecture-file: lessons/<slug>/lecture.md]"
+)
+
+_LECTURE_RECORD_PROMPT = (
+    "A lecture episode was just generated: source {source} (~{words} words, "
+    "about {minutes:.0f} minutes), audio {audio}. Record it in "
+    "docs/current-state.md as an episode generated on {today} and UNPROBED, "
+    "with one line on what it covers, so a later /recall can probe its "
+    "content (listening = presented; nothing more). Reply with exactly: SILENT"
+)
+
 # Test mode is a real boundary: pi runs with read-only tools, so the
 # knowledge base cannot be written no matter what the model decides.
 # (bash is excluded precisely because it can write.) The prompt text below
@@ -182,6 +226,11 @@ def build_system_prompt(settings: Settings, *, test_mode: bool) -> str:
         "A recall-check chat without a lesson topic is not a lesson; no "
         "directive needed. When in doubt between starting or not, start — "
         "a stray closed thread is cheaper than a flooded main channel.",
+        "- A second directive type exists for /lecture: when a prompt tells "
+        "you a lecture episode was requested, you write the markdown and "
+        "end your reply with [lecture-file: <path you wrote>]. The code "
+        "renders that file to audio and serves the link; the line is "
+        "stripped like the lesson directives.",
     ]
     if test_mode:
         parts.extend(
@@ -215,6 +264,8 @@ class TeachingEngine:
         self._lessons = LessonManager(
             hub, settings.discord_channel_id, settings.lesson_state_file
         )
+        # Audio render is injectable so tests never shell out to TTS.
+        self._render_audio = render_lecture_audio
 
     def set_voice(self, voice: VoiceRuntime) -> None:
         """Attach the voice layer post-construction: the runtime needs the
@@ -299,6 +350,9 @@ class TeachingEngine:
         if command == "lesson":
             await self._handle_lesson(payload)
             return True
+        if command == "lecture":
+            await self._handle_lecture(payload)
+            return True
         if command == "voice":
             await self._handle_voice_command(payload)
             return True
@@ -381,6 +435,98 @@ class TeachingEngine:
             )
             return
         await self._hub.post_followup(interaction_id, note, ephemeral=False)
+
+    async def _handle_lecture(self, payload: dict[str, Any]) -> None:
+        """Podcast-lecture generation — code-owned like /mode: pi authors
+        the markdown (knowledge-base work), this code renders it to audio
+        and serves the link (build work pi's tools can't do)."""
+        interaction_id = str(payload.get("interaction_id"))
+        topic = str((payload.get("options") or {}).get("topic") or "").strip()
+        if not topic:
+            await self._hub.post_followup(
+                interaction_id, "Usage: /lecture topic:<text>", ephemeral=True
+            )
+            return
+        channel_id = int(payload.get("channel_id"))
+
+        async def run() -> None:
+            try:
+                await self._produce_lecture(channel_id, interaction_id, topic)
+            except Exception:
+                logger.exception("Lecture generation failed.")
+                with suppress(HubError):
+                    await self._hub.post_followup(
+                        interaction_id,
+                        "(lecture generation failed — check the agent log)",
+                        ephemeral=True,
+                    )
+
+        asyncio.create_task(run())
+
+    async def _produce_lecture(
+        self, channel_id: int, interaction_id: str, topic: str
+    ) -> None:
+        raw = await self._ask_pi_raw(
+            channel_id, _LECTURE_WRITE_PROMPT.format(topic=topic)
+        )
+        if raw is None:
+            await self._hub.post_followup(
+                interaction_id, "(teacher brain hiccuped)", ephemeral=False
+            )
+            return
+        declared, display = split_directive(raw)
+        # Lesson directives in the reply are still honored (a lecture can
+        # open a thread); the learner only sees the stripped text.
+        display = await self._lessons.process(display)
+        if declared is None:
+            await self._hub.post_followup(
+                interaction_id,
+                (display + "\n\n" if display else "")
+                + "⚠️ I wrote no [lecture-file:] directive, so nothing was "
+                "rendered. Ask me to try again.",
+                ephemeral=False,
+            )
+            return
+        try:
+            source = resolve_lesson_file(self._settings.knowledge_root, declared)
+        except LectureError as exc:
+            await self._hub.post_followup(
+                interaction_id, f"⚠️ Lecture file problem: {exc}", ephemeral=False
+            )
+            return
+        audio_path = source.with_name("lecture.mp3")
+        try:
+            await self._render_audio(
+                source,
+                audio_path,
+                tool=self._settings.lecture_tts,
+                knowledge_root=self._settings.knowledge_root,
+            )
+        except (LectureError, OSError) as exc:
+            await self._hub.post_followup(
+                interaction_id, f"⚠️ Audio render failed: {exc}", ephemeral=False
+            )
+            return
+        relative = audio_path.resolve().relative_to(
+            (self._settings.knowledge_root / "lessons").resolve()
+        )
+        link = f"{self._settings.lecture_public_url}/lectures/{relative.as_posix()}"
+        words = len(source.read_text(encoding='utf-8').split())
+        text = (
+            (display + "\n\n") if display else ""
+        ) + f"🎧 **Episode ready:** {link}"
+        await self._hub.post_followup(interaction_id, text, ephemeral=False)
+        # Retention hook: the agent generated the intake, so it records
+        # what the learner consumed — a later /recall can probe it. This
+        # write is pi's (knowledge base), not the code's.
+        record = _LECTURE_RECORD_PROMPT.format(
+            source=declared.as_posix(),
+            words=words,
+            minutes=words / 145,
+            audio=relative.as_posix(),
+            today=date.today().isoformat(),
+        )
+        await self._ask_pi_raw(channel_id, record)
 
     async def _handle_voice_state(self, payload: dict[str, Any]) -> None:
         """Learner joined/left/moved voice channels (registration opted in).
@@ -520,6 +666,19 @@ class TeachingEngine:
         return await self._ask_pi(self._settings.discord_channel_id, prompt)
 
     async def _ask_pi(self, channel_id: int, prompt: str) -> str | None:
+        raw = await self._ask_pi_raw(channel_id, prompt)
+        if raw is None:
+            return None
+        # Lesson directives are honored everywhere pi speaks (chat, commands,
+        # voice); the learner never sees the marker lines.
+        return await self._lessons.process(raw)
+
+    async def _ask_pi_raw(self, channel_id: int, prompt: str) -> str | None:
+        """Prompt pi with the date prefix; return the UNstripped reply.
+
+        Callers that parse their own directives (e.g. /lecture) need the
+        raw text; everyone else should use _ask_pi.
+        """
         try:
             await self._hub.typing(channel_id)
         except HubError:
@@ -533,6 +692,4 @@ class TeachingEngine:
             "Pi run: model=%s/%s cost=$%.4f",
             result.provider, result.model_id, result.cost,
         )
-        # Lesson directives are honored everywhere pi speaks (chat, commands,
-        # voice); the learner never sees the marker lines.
-        return await self._lessons.process(result.text)
+        return result.text

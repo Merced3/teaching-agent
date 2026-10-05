@@ -87,6 +87,7 @@ async def agent_service(ctx: ServiceContext) -> None:
         engine.dispatch,
         remote_ptt=getattr(engine, "remote_ptt", None),
         ptt_token=settings.voice_ptt_token,
+        lectures_dir=settings.knowledge_root / "lessons",
     )
     server = uvicorn.Server(
         uvicorn.Config(

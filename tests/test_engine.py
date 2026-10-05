@@ -283,3 +283,75 @@ async def test_next_command_prompts_pi_with_the_menu() -> None:
     await __import__("asyncio").sleep(0)
     sent = pi.prompt.await_args.args[0]
     assert "/next" in sent and "recommend" in sent
+
+
+def lecture_env(tmp_path: Any) -> dict:
+    (tmp_path / "lessons" / "crash-proofing").mkdir(parents=True)
+    (tmp_path / "lessons" / "crash-proofing" / "lecture.md").write_text(
+        "# Crash proofing\n\nA spoken lecture about crash windows.", encoding="utf-8"
+    )
+    return {
+        "TEACHING_AGENT_KNOWLEDGE_ROOT": str(tmp_path),
+        "TEACHING_AGENT_LECTURE_PUBLIC_URL": "https://ced.example.ts.net",
+        "TEACHING_AGENT_LESSON_STATE_FILE": str(tmp_path / "state.json"),
+    }
+
+
+async def test_lecture_writes_renders_and_posts_link(tmp_path) -> None:
+    """The full code-owned flow: pi authors the md, code renders audio,
+    the link is posted, and pi is asked to record the unprobed episode."""
+    engine, hub, pi = make_engine(lecture_env(tmp_path))
+    engine._render_audio = AsyncMock()  # noqa: SLF001 — never shell out to TTS in tests
+    pi.prompt.return_value = pi_reply(
+        "Two sentences about the episode.\n[lecture-file: lessons/crash-proofing/lecture.md]"
+    )
+    result = await engine.dispatch(command("lecture", {"topic": "crash windows"}))
+    assert result == {"defer": True, "ephemeral": False}
+    await __import__("asyncio").sleep(0)
+    # Pi got the writing prompt carrying the topic.
+    first_prompt = pi.prompt.await_args_list[0].args[0]
+    assert "/lecture topic:crash windows" in first_prompt
+    # Code-owned render step ran on the declared file.
+    render = engine._render_audio  # noqa: SLF001
+    render.assert_awaited_once()
+    source, output = render.await_args.args[:2]
+    assert source.name == "lecture.md" and output.name == "lecture.mp3"
+    assert output.parent.name == "crash-proofing"
+    # The followup carries pi's stripped text plus the served link.
+    followup = hub.post_followup.await_args
+    text = followup.args[1]
+    assert "[lecture-file:" not in text
+    assert "Two sentences about the episode." in text
+    assert "https://ced.example.ts.net/lectures/crash-proofing/lecture.mp3" in text
+    # Retention hook: pi is asked to record the episode as unprobed.
+    second_prompt = pi.prompt.await_args_list[1].args[0]
+    assert "UNPROBED" in second_prompt and "docs/current-state.md" in second_prompt
+
+
+async def test_lecture_without_directive_renders_nothing(tmp_path) -> None:
+    engine, hub, pi = make_engine(lecture_env(tmp_path))
+    engine._render_audio = AsyncMock()  # noqa: SLF001
+    pi.prompt.return_value = pi_reply("I chatted but never wrote a file.")
+    await engine.dispatch(command("lecture", {"topic": "state machines"}))
+    await __import__("asyncio").sleep(0)
+    engine._render_audio.assert_not_awaited()  # noqa: SLF001
+    assert "nothing was" in hub.post_followup.await_args.args[1]
+
+
+async def test_lecture_rejects_paths_outside_lessons(tmp_path) -> None:
+    """Pi is prompt-guided, not trusted: a declared path outside lessons/
+    fails at validation, never at the TTS call."""
+    engine, hub, pi = make_engine(lecture_env(tmp_path))
+    engine._render_audio = AsyncMock()  # noqa: SLF001
+    pi.prompt.return_value = pi_reply("Oops.\n[lecture-file: ../secret.md]")
+    await engine.dispatch(command("lecture", {"topic": "x"}))
+    await __import__("asyncio").sleep(0)
+    engine._render_audio.assert_not_awaited()  # noqa: SLF001
+    assert "outside lessons/" in hub.post_followup.await_args.args[1]
+
+
+async def test_lecture_requires_a_topic(tmp_path) -> None:
+    engine, hub, pi = make_engine(lecture_env(tmp_path))
+    await engine.dispatch(command("lecture", {"topic": "  "}))
+    pi.prompt.assert_not_awaited()
+    assert hub.post_followup.await_args.kwargs.get("ephemeral") is True

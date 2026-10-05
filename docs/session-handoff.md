@@ -42,6 +42,11 @@ At every session start — and always when the learner says "it's been a while" 
   human-nicer; check file form before scripted edits either way.
 - The handoff prompt omits a `Model:` line on purpose; fill it at close with the actual
   model(s).
+- Lecture episodes (`/lecture`) are recorded in `docs/current-state.md` as
+  `episode generated (<date>), UNPROBED` plus one line on what it covers, the moment they
+  are generated. Listening is `presented` — nothing more. An episode stays UNPROBED until a
+  recall check probes its content; then record the result as level + elapsed time and drop
+  the UNPROBED mark.
 
 ## Drift test
 
