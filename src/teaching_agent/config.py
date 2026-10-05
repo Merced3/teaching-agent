@@ -44,6 +44,8 @@ class Settings:
     recall_check_interval_seconds: int
     lecture_public_url: str
     lecture_tts: str
+    lecture_edge_voice: str
+    lecture_edge_rate: str
     voice_enabled: bool
     voice_autojoin: bool
     voice_transport: str
@@ -127,6 +129,12 @@ class Settings:
             raise ConfigurationError(
                 "TEACHING_AGENT_LECTURE_TTS must be 'elevenlabs' or 'edge'."
             )
+        lecture_edge_voice = environment.get(
+            "TEACHING_AGENT_LECTURE_EDGE_VOICE", "en-US-AndrewNeural"
+        ).strip()
+        lecture_edge_rate = environment.get(
+            "TEACHING_AGENT_LECTURE_EDGE_RATE", "-4%"
+        ).strip()
         voice_enabled = _parse_bool(environment.get("TEACHING_AGENT_VOICE_ENABLED", "false"))
         voice_autojoin = _parse_bool(
             environment.get("TEACHING_AGENT_VOICE_AUTOJOIN", "true")
@@ -197,6 +205,8 @@ class Settings:
             recall_check_interval_seconds=recall_check_interval_seconds,
             lecture_public_url=lecture_public_url,
             lecture_tts=lecture_tts,
+            lecture_edge_voice=lecture_edge_voice,
+            lecture_edge_rate=lecture_edge_rate,
             voice_enabled=voice_enabled,
             voice_autojoin=voice_autojoin,
             voice_transport=voice_transport,

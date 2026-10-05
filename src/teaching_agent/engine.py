@@ -501,6 +501,8 @@ class TeachingEngine:
                 audio_path,
                 tool=self._settings.lecture_tts,
                 knowledge_root=self._settings.knowledge_root,
+                edge_voice=self._settings.lecture_edge_voice,
+                edge_rate=self._settings.lecture_edge_rate,
             )
         except (LectureError, OSError) as exc:
             await self._hub.post_followup(

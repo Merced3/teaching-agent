@@ -15,6 +15,7 @@ dependencies = [
   "python-dotenv>=1.0,<2",
   "websockets>=12,<16",
   "numpy>=1.26,<3",
+  "edge-tts>=7,<8",
   "automation-harness",
 ]
 

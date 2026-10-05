@@ -35,6 +35,11 @@ _RENDER_SCRIPTS = {
 
 RENDER_TIMEOUT_SECONDS = 900
 
+# The free pipeline's voice: Andrew is edge-tts's most natural
+# conversational voice — closest free thing to podcast narration.
+DEFAULT_EDGE_VOICE = "en-US-AndrewNeural"
+DEFAULT_EDGE_RATE = "-4%"
+
 
 class LectureError(RuntimeError):
     """Raised when a lecture episode cannot be produced."""
@@ -72,18 +77,24 @@ def resolve_lesson_file(knowledge_root: Path, declared: Path) -> Path:
 
 
 async def render_lecture_audio(
-    source: Path, output: Path, *, tool: str, knowledge_root: Path
+    source: Path,
+    output: Path,
+    *,
+    tool: str,
+    knowledge_root: Path,
+    edge_voice: str = DEFAULT_EDGE_VOICE,
+    edge_rate: str = DEFAULT_EDGE_RATE,
 ) -> None:
     """Render lecture markdown to MP3 with the matching tools/ script."""
     script = knowledge_root / "tools" / _RENDER_SCRIPTS[tool]
     if not script.is_file():
         raise LectureError(f"render tool missing: {script}")
+    command = [sys.executable, str(script), str(source), "--output", str(output)]
+    if tool == "edge":
+        # '--rate=-4%' as one arg: a bare '-4%' looks like a flag to argparse.
+        command += [f"--voice={edge_voice}", f"--rate={edge_rate}"]
     process = await asyncio.create_subprocess_exec(
-        sys.executable,
-        str(script),
-        str(source),
-        "--output",
-        str(output),
+        *command,
         cwd=knowledge_root,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
