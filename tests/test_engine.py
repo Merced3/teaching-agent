@@ -317,9 +317,12 @@ async def test_lecture_writes_renders_and_posts_link(tmp_path) -> None:
     source, output = render.await_args.args[:2]
     assert source.name == "lecture.md" and output.name == "lecture.mp3"
     assert output.parent.name == "crash-proofing"
-    # The followup carries pi's stripped text plus the served link.
-    followup = hub.post_followup.await_args
-    text = followup.args[1]
+    # The command is acked immediately on the interaction token (which
+    # expires after 15 min); the result arrives as a channel message.
+    ack = hub.post_followup.await_args.args[1]
+    assert "few minutes" in ack
+    posted = [c.args[1] for c in hub.post_message.await_args_list]
+    text = posted[-1]
     assert "[lecture-file:" not in text
     assert "Two sentences about the episode." in text
     assert "https://ced.example.ts.net/lectures/crash-proofing/lecture.mp3" in text
@@ -335,7 +338,8 @@ async def test_lecture_without_directive_renders_nothing(tmp_path) -> None:
     await engine.dispatch(command("lecture", {"topic": "state machines"}))
     await __import__("asyncio").sleep(0)
     engine._render_audio.assert_not_awaited()  # noqa: SLF001
-    assert "nothing was" in hub.post_followup.await_args.args[1]
+    posted = [c.args[1] for c in hub.post_message.await_args_list]
+    assert "nothing was" in posted[-1]
 
 
 async def test_lecture_rejects_paths_outside_lessons(tmp_path) -> None:
@@ -347,7 +351,8 @@ async def test_lecture_rejects_paths_outside_lessons(tmp_path) -> None:
     await engine.dispatch(command("lecture", {"topic": "x"}))
     await __import__("asyncio").sleep(0)
     engine._render_audio.assert_not_awaited()  # noqa: SLF001
-    assert "outside lessons/" in hub.post_followup.await_args.args[1]
+    posted = [c.args[1] for c in hub.post_message.await_args_list]
+    assert "outside lessons/" in posted[-1]
 
 
 async def test_lecture_requires_a_topic(tmp_path) -> None:

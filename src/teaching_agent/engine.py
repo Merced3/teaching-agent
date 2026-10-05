@@ -455,10 +455,9 @@ class TeachingEngine:
             except Exception:
                 logger.exception("Lecture generation failed.")
                 with suppress(HubError):
-                    await self._hub.post_followup(
-                        interaction_id,
+                    await self._hub.post_message(
+                        channel_id,
                         "(lecture generation failed — check the agent log)",
-                        ephemeral=True,
                     )
 
         asyncio.create_task(run())
@@ -466,32 +465,39 @@ class TeachingEngine:
     async def _produce_lecture(
         self, channel_id: int, interaction_id: str, topic: str
     ) -> None:
+        # Ack fast on the interaction token (it expires after 15 min — a
+        # long render could outlive it), then deliver results as ordinary
+        # channel messages, which never expire. A failed ack is not fatal:
+        # the episode and its record matter more than the ack.
+        with suppress(HubError):
+            await self._hub.post_followup(
+                interaction_id,
+                f"🎙️ Writing an episode on **{topic}** — this takes a few minutes.",
+                ephemeral=False,
+            )
         raw = await self._ask_pi_raw(
             channel_id, _LECTURE_WRITE_PROMPT.format(topic=topic)
         )
         if raw is None:
-            await self._hub.post_followup(
-                interaction_id, "(teacher brain hiccuped)", ephemeral=False
-            )
+            await self._hub.post_message(channel_id, "(teacher brain hiccuped)")
             return
         declared, display = split_directive(raw)
         # Lesson directives in the reply are still honored (a lecture can
         # open a thread); the learner only sees the stripped text.
         display = await self._lessons.process(display)
         if declared is None:
-            await self._hub.post_followup(
-                interaction_id,
+            await self._hub.post_message(
+                channel_id,
                 (display + "\n\n" if display else "")
                 + "⚠️ I wrote no [lecture-file:] directive, so nothing was "
                 "rendered. Ask me to try again.",
-                ephemeral=False,
             )
             return
         try:
             source = resolve_lesson_file(self._settings.knowledge_root, declared)
         except LectureError as exc:
-            await self._hub.post_followup(
-                interaction_id, f"⚠️ Lecture file problem: {exc}", ephemeral=False
+            await self._hub.post_message(
+                channel_id, f"⚠️ Lecture file problem: {exc}"
             )
             return
         audio_path = source.with_name("lecture.mp3")
@@ -505,8 +511,8 @@ class TeachingEngine:
                 edge_rate=self._settings.lecture_edge_rate,
             )
         except (LectureError, OSError) as exc:
-            await self._hub.post_followup(
-                interaction_id, f"⚠️ Audio render failed: {exc}", ephemeral=False
+            await self._hub.post_message(
+                channel_id, f"⚠️ Audio render failed: {exc}"
             )
             return
         relative = audio_path.resolve().relative_to(
@@ -514,13 +520,9 @@ class TeachingEngine:
         )
         link = f"{self._settings.lecture_public_url}/lectures/{relative.as_posix()}"
         words = len(source.read_text(encoding='utf-8').split())
-        text = (
-            (display + "\n\n") if display else ""
-        ) + f"🎧 **Episode ready:** {link}"
-        await self._hub.post_followup(interaction_id, text, ephemeral=False)
-        # Retention hook: the agent generated the intake, so it records
-        # what the learner consumed — a later /recall can probe it. This
-        # write is pi's (knowledge base), not the code's.
+        # Retention hook BEFORE the link post: the record is the point of
+        # the feature and must survive a Discord hiccup. This write is
+        # pi's (knowledge base), not the code's.
         record = _LECTURE_RECORD_PROMPT.format(
             source=declared.as_posix(),
             words=words,
@@ -529,6 +531,10 @@ class TeachingEngine:
             today=date.today().isoformat(),
         )
         await self._ask_pi_raw(channel_id, record)
+        text = (
+            (display + "\n\n") if display else ""
+        ) + f"🎧 **Episode ready:** {link}"
+        await self._hub.post_message(channel_id, text)
 
     async def _handle_voice_state(self, payload: dict[str, Any]) -> None:
         """Learner joined/left/moved voice channels (registration opted in).
