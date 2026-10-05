@@ -1,0 +1,31 @@
+# The Invariant and the Write Boundary
+
+This one's aimed at the thing that keeps fading. Not a mechanism — a pair of names. Three times now, the machinery has stuck and the labels have gone. So this episode isn't going to re-explain the machinery. It's going to weld the names to the machinery you already have, so the next time someone says either word, the whole picture comes up with it.
+
+## The word is invariant
+
+Start with what you know cold. You have a rule about your data that must be true at every moment the system is observable. Not most of the time. Not after a cleanup job runs. Always. A balance never goes negative. An order in the state OPEN has at least one item. Every receipt points at a send that actually happened.
+
+That rule has a name. It's called an invariant. Invariant — the thing that does not vary. Everything else in the system is in motion: requests arriving, retries firing, processes crashing mid-write. Through all of that motion, the invariant is the one thing that holds still. If you ever observe the system and the rule is broken, that's not a quirk — that's a bug, full stop, no matter how briefly it lasted.
+
+Here's the anchor that makes the name stick. You already know atomicity — all-or-nothing. Atomicity is a mechanism. It's a tool. The invariant is not a tool. The invariant is the promise. Atomicity is one of the ways you keep the promise. When you reached for a name earlier and came up with "atomic," you were grabbing the wrench when someone asked for the blueprint. The rule is the invariant. The rule is the invariant. Say it once more: the rule is the invariant.
+
+## Why the rule needs a place
+
+Now the second name, and this one answers a question you've actually asked: where does the rule get enforced?
+
+A rule that lives in a comment, or in a review checklist, or in one careful endpoint, is not a rule. It's a hope. The system has many paths that can change state — the obvious handler, the admin tool, the backfill script, the retry path, the migration someone writes at midnight. Every single one of those paths is a place where the invariant can die.
+
+So you don't scatter enforcement across the paths. You identify the complete set of paths that can change state, and you enforce the rule on every one of them. That set — the full collection of code paths that change state — is called the write boundary. The write boundary is not one function. It's a perimeter. Anything inside the perimeter can mutate state; everything that mutates state must pass the invariant check on the way in.
+
+The guarded write you re-derived from scratch — update where the condition holds, check the row count, fail if zero rows moved — that is enforcement at the write boundary. One perimeter crossing, one check, atomic. The mechanism you own already lives at the boundary. The name just tells you where it lives and why it has to live there and nowhere else.
+
+## The pair, together
+
+So the two names lock together. The invariant is the rule — what must always be true. The write boundary is the perimeter — where it gets enforced, on every path that changes state. Rule and perimeter. Promise and checkpoint. What and where.
+
+And notice how this connects to the rest of what you know. The crash window is the space between two durable steps — and the reason that space is dangerous is that inside it, the invariant is unprotected. Transactions shrink the window by making a bundle of writes atomic — which is enforcement at the write boundary, keeping the invariant true across what would otherwise be a gap. The keyed receipt makes retries safe — and the receipt write has to be atomic with the action, inside the boundary, or the invariant "every receipt records a real result" breaks. It all hangs off the same two ideas. Rule, and perimeter.
+
+## The drill
+
+One closing exercise, for the next unfamiliar system you read. Don't ask "what does this code do" first. Ask two questions. What is the invariant — what must always be true here? And where is the write boundary — what is the complete set of paths that can change state? If you can answer both, you understand the system. If the system's authors can't answer both, you understand the system better than they do, and you know exactly where its bugs are hiding.

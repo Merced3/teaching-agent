@@ -171,7 +171,10 @@ _LECTURE_RECORD_PROMPT = (
     "about {minutes:.0f} minutes), audio {audio}. Record it in "
     "docs/current-state.md as an episode generated on {today} and UNPROBED, "
     "with one line on what it covers, so a later /recall can probe its "
-    "content (listening = presented; nothing more). Reply with exactly: SILENT"
+    "content (listening = presented; nothing more). Then commit the episode "
+    "files and the current-state update to git — the intake record is "
+    "durable evidence and should not wait for session close. Reply with "
+    "exactly: SILENT"
 )
 
 # Test mode is a real boundary: pi runs with read-only tools, so the
