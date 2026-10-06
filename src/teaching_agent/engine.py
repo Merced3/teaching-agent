@@ -212,6 +212,19 @@ def build_system_prompt(settings: Settings, *, test_mode: bool) -> str:
         "read-only plus git. This is enforced at the tool level — attempts to "
         "change code or config fail by design. Describe desired code changes "
         "in chat instead.",
+        "- READS ARE UNRESTRICTED: only your writes are confined to the "
+        "knowledge base. When the learner references a project, file, or "
+        "folder anywhere on this machine, read it directly — absolute paths "
+        "work with your read/grep/find/ls tools. Never refuse to look at "
+        "something because it lives outside the knowledge base.",
+        "- FRESHNESS RULE (anti-drift): before you teach a lesson, answer a "
+        "question, or run a recall check about any project or body of "
+        "material, re-read that project's current files in THIS turn — its "
+        "docs and the relevant code — using the [date:] prefix as the real "
+        "date. Never teach from memory of past sessions or from notes you "
+        "have not just re-read; projects change, and dates drift. When you "
+        "state a fact about a changing project, say it as of today's date "
+        "with the file you just read as the source.",
         "- Lesson threads are how the channel stays clean: the main channel "
         "is an index of evidence, transcripts and working-out are exhaust "
         "that belongs in a thread. You control this with directive lines "

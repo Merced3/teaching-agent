@@ -434,3 +434,14 @@ OUTCOME (2026-10-05, same day): LIVE-VERIFIED in the lab channel via simulated c
 
 ## 2026-10-06 — H1 revision data point: short repeated lectures retain
 Hypothesis under test: H1 (audio is orientation, not retention). New evidence: learner listened to the three short /lecture episodes on repeat (sauna, self-directed) and then recalled unaided two previously serial-fading items (invariant/write-boundary names ~3d; crash-window general form ~4d). Verdict: H1 narrows — LONG single-pass audio fails; SHORT targeted episodes, voluntarily repeated, can carry recall. Episodes may act as compact re-presentations; repetition was learner-driven, not scheduled. Design consequence: keep /lecture episodes short and single-target; treat them as re-presentation fuel, not substitutes for probes.
+
+## 2026-10-06 — Reads unbounded, fixed-phrase fillers, ElevenLabs → edge-tts
+
+Three learner-reported friction points, one session:
+
+1. **Read boundary.** Report: "the teaching agent can't read anything outside of its own docs," and it teaches drifting facts (dates especially) about projects it recently changed. Fix: system prompt now states READS ARE UNRESTRICTED (only *writes* stay confined to the knowledge base — the `knowledge-only-writes` extension boundary is unchanged) and adds a FRESHNESS RULE: before any lesson, answer, or recall check about a project, re-read that project's current files in the same turn, date claims as of the `[date:]` prefix with the just-read file as source. Enforcement is prompt-level (reads were never physically blocked; the model believed they were).
+2. **Fillers.** Report: rotating "Mm." / "let me check" clips every ~2 s are personality the learner doesn't want while waiting. Change: one fixed phrase ("Loading an answer.") at a fixed 2 s interval, synthesized once per session with the ACTIVE TTS (so it matches the answering voice and costs nothing) and re-synthesized on `/voice` TTS swaps. Empty `TEACHING_AGENT_VOICE_FILLER_TEXT` falls back to the old clips-dir behavior. Learner deprioritized the optional richer variant (narrating each step before the answer); the reliable simple signal ships first.
+3. **TTS cost.** Report: ElevenLabs sub isn't worth it for a proof-of-concept voice. Change: default TTS provider is now `edge` (edge-tts, free Microsoft neural voices, already the lecture pipeline, streams raw PCM — zero new dependencies); ElevenLabs stays as opt-in and its key/voice-id validation only fires when selected. Learner explicitly chose edge over fully-local piper/kokoro (quality + zero setup) while accepting it's still cloud — the swap seam (`/voice action:tts`) means a local provider can be added later without touching the conversation layer.
+
+Evidence: 61 tests green; ruff findings unchanged from baseline (9 pre-existing). NOT yet live-verified: edge voice in a real call, filler phrase cadence.
+Verdict: built, awaiting live verification.

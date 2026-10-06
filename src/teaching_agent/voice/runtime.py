@@ -17,7 +17,7 @@ from .conversation import AskPi, TranscriptSink, VoiceConversation
 from .ptt import RemotePTT
 from .stt import STT_PROVIDERS, DeepgramSTT, STTProvider
 from .transport import BridgeTransport, DiscordTransport, VoiceTransport
-from .tts import TTS_PROVIDERS, ElevenLabsTTS, TTSProvider
+from .tts import TTS_PROVIDERS, EdgeTTS, ElevenLabsTTS, TTSProvider
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +104,8 @@ class VoiceRuntime:
                 ask_pi=self._ask_pi,
                 transcript=self._transcript,
                 filler_dir=self._settings.voice_filler_dir,
+                filler_text=self._settings.voice_filler_text or None,
+                filler_interval=self._settings.voice_filler_interval_seconds,
                 remote_ptt=self._remote_ptt,
             )
         await self._conversation.join(channel_id)
@@ -159,6 +161,12 @@ class VoiceRuntime:
                 self._settings.elevenlabs_api_key,
                 voice_id=self._voice_id,
                 model_id=self._settings.voice_tts_model_id,
+            )
+        if self._tts_name == "edge":
+            # Free default voice; /voice action:voice swaps the voice NAME.
+            return EdgeTTS(
+                voice_id=self._voice_id or "en-US-AndrewNeural",
+                rate=self._settings.voice_edge_rate,
             )
         raise VoiceError(f"No constructor for TTS provider {self._tts_name!r}")
 

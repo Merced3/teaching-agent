@@ -61,8 +61,8 @@ class TranscriptSink:
     reply: OnReply
     unanswered: OnUnanswered
 
-_FILLER_DELAY_SECONDS = 2.0  # pi silence this long -> first "Mm."
-_FILLER_INTERVAL_SECONDS = 3.0  # then repeat (rotating clips) until pi answers
+_FILLER_DELAY_SECONDS = 2.0  # pi silence this long -> first filler
+_FILLER_INTERVAL_SECONDS = 2.0  # then repeat at this interval until pi answers
 _FLUSH_GRACE_SECONDS = 0.8  # after speaking stops, wait this long for the
 # final transcript fragment before firing the merged turn
 
@@ -87,6 +87,8 @@ class VoiceConversation:
         ask_pi: AskPi,
         transcript: TranscriptSink | None = None,
         filler_dir: Path | None = None,
+        filler_text: str | None = None,
+        filler_interval: float = _FILLER_INTERVAL_SECONDS,
         remote_ptt: RemotePTT | None = None,
     ) -> None:
         self._transport = transport
@@ -97,6 +99,13 @@ class VoiceConversation:
         self._transcript = transcript
         self._filler_dir = filler_dir
         self._filler_clips: list[bytes] | None = None  # lazy: loaded on first use
+        # Filler phrase mode (default): one fixed sentence ("Loading an answer."),
+        # synthesized once per TTS voice with the ACTIVE provider (free with
+        # edge), then replayed verbatim at a fixed interval. The learner asked
+        # for no human-sounding variety while waiting — one signal, one meaning.
+        self._filler_text = filler_text
+        self._filler_interval = filler_interval
+        self._filler_pcm: bytes | None = None  # lazy: synthesized on first use
         self._remote_ptt = remote_ptt
 
         self._ws: websockets.ClientConnection | None = None
@@ -124,8 +133,11 @@ class VoiceConversation:
         return type(stt).__name__
 
     def set_tts(self, tts: TTSProvider) -> str:
-        """Swap voice; takes effect on the next spoken turn."""
+        """Swap voice; takes effect on the next spoken turn. The cached
+        filler phrase must be re-synthesized — it should sound like the
+        voice that is about to answer."""
         self._tts = tts
+        self._filler_pcm = None
         return type(tts).__name__
 
     # -- lifecycle ----------------------------------------------------------
@@ -347,28 +359,56 @@ class VoiceConversation:
         except Exception:
             logger.exception("Voice turn %d failed.", generation)
 
+    async def _next_filler(self, index: int) -> bytes | None:
+        """The filler audio for this beat. Phrase mode returns the same
+        cached clip every time; clips-dir mode rotates pre-generated files."""
+        if self._filler_text:
+            if self._filler_pcm is None:
+                parts: list[bytes] = []
+                try:
+                    async for chunk in self._tts.stream_hub_pcm(self._filler_text):
+                        parts.append(chunk)
+                except Exception:
+                    logger.exception("Filler synthesis failed; fillers off.")
+                    self._filler_pcm = b""
+                    return None
+                self._filler_pcm = b"".join(parts)
+            return self._filler_pcm or None
+        clips = self._load_fillers()
+        if not clips:
+            return None
+        return clips[index % len(clips)]
+
     async def _ask_with_fillers(self, generation: int, learner_text: str) -> str | None:
-        """Ask pi; while it thinks in silence, hold the floor with a short
-        pre-generated "Mm." so the learner knows to wait — a courtesy
-        signal, not a second LLM job."""
+        """Ask pi; while it thinks in silence, say what is happening
+        ("Loading an answer.") at a fixed interval — a status signal, not
+        a personality. No variants by design."""
         ask = asyncio.ensure_future(
             self._ask_pi(_VOICE_TURN_TEMPLATE.format(text=learner_text))
         )
-        clips = self._load_fillers()
-        if not clips:
-            return await ask
+        first_delay = (
+            self._filler_interval if self._filler_text else _FILLER_DELAY_SECONDS
+        )
+        delay = first_delay
         index = 0
         try:
             while not ask.done():
-                delay = _FILLER_DELAY_SECONDS if index == 0 else _FILLER_INTERVAL_SECONDS
                 try:
                     await asyncio.wait_for(asyncio.shield(ask), timeout=delay)
                 except asyncio.TimeoutError:
                     if generation != self._generation:
                         break
-                    logger.info("pi still thinking — playing filler %d.", index + 1)
-                    await self._play_filler(generation, clips[index % len(clips)])
+                    clip = await self._next_filler(index)
+                    if clip is None:
+                        return await ask
                     index += 1
+                    logger.info("pi still thinking — playing filler %d.", index)
+                    await self._play_filler(generation, clip)
+                    delay = (
+                        self._filler_interval
+                        if self._filler_text
+                        else _FILLER_INTERVAL_SECONDS
+                    )
             return await ask
         except asyncio.CancelledError:
             ask.cancel()

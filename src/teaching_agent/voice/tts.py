@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator, Callable
 
+import edge_tts
 import httpx
 
 from .pcm import mono_24k_to_stereo_48k
@@ -84,6 +85,47 @@ class ElevenLabsTTS(TTSProvider):
             raise TTSError(f"ElevenLabs unreachable: {exc}") from exc
 
 
+class EdgeTTS(TTSProvider):
+    """Microsoft Edge neural voices via edge-tts — free, no API key.
+
+    Still a cloud service (Microsoft's), but costs nothing and sounds far
+    more human than the fully-local options we have on Windows. Streams
+    raw s16le 24 kHz mono PCM, same shape as the ElevenLabs provider, so
+    the conversation layer cannot tell the difference. Voice identity is
+    a voice NAME (e.g. en-US-AndrewNeural), swappable live via /voice.
+    """
+
+    def __init__(self, *, voice_id: str, rate: str = "+0%") -> None:
+        self.voice_id = voice_id
+        self.rate = rate
+
+    async def stream_hub_pcm(self, text: str) -> AsyncIterator[bytes]:
+        communicate = edge_tts.Communicate(
+            text,
+            voice=self.voice_id,
+            rate=self.rate,
+            output_format="raw-24khz-16bit-mono-pcm",
+        )
+        pending = b""
+        try:
+            async for message in communicate.stream():
+                if message.get("type") != "audio":
+                    continue
+                pending += message["data"]
+                # s16le samples are 2 bytes; never split a sample.
+                whole = pending[: len(pending) // 2 * 2]
+                pending = pending[len(whole) :]
+                if whole:
+                    yield mono_24k_to_stereo_48k(whole)
+            if pending:
+                yield mono_24k_to_stereo_48k(pending + b"\x00")
+        except TTSError:
+            raise
+        except Exception as exc:
+            raise TTSError(f"edge-tts failed: {exc}") from exc
+
+
 TTS_PROVIDERS: dict[str, Callable[..., TTSProvider]] = {
     "elevenlabs": ElevenLabsTTS,
+    "edge": EdgeTTS,
 }

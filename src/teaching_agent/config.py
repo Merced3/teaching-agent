@@ -54,8 +54,11 @@ class Settings:
     voice_tts_provider: str
     voice_tts_voice_id: str
     voice_tts_model_id: str
+    voice_edge_rate: str
     voice_post_transcript: bool
     voice_filler_dir: Path
+    voice_filler_text: str
+    voice_filler_interval_seconds: float
     voice_ptt_token: str
     deepgram_api_key: str
     elevenlabs_api_key: str
@@ -150,10 +153,13 @@ class Settings:
             "TEACHING_AGENT_VOICE_BRIDGE_URL", "http://localhost:8200"
         ).strip()
         voice_stt_provider = environment.get("TEACHING_AGENT_VOICE_STT", "deepgram").strip()
-        voice_tts_provider = environment.get("TEACHING_AGENT_VOICE_TTS", "elevenlabs").strip()
+        voice_tts_provider = environment.get("TEACHING_AGENT_VOICE_TTS", "edge").strip()
         voice_tts_voice_id = environment.get("TEACHING_AGENT_VOICE_TTS_VOICE_ID", "").strip()
         voice_tts_model_id = environment.get(
             "TEACHING_AGENT_VOICE_TTS_MODEL", "eleven_turbo_v2_5"
+        ).strip()
+        voice_edge_rate = environment.get(
+            "TEACHING_AGENT_VOICE_EDGE_RATE", "+0%"
         ).strip()
         voice_post_transcript = _parse_bool(
             environment.get("TEACHING_AGENT_VOICE_POST_TRANSCRIPT", "true")
@@ -162,17 +168,41 @@ class Settings:
             environment.get("TEACHING_AGENT_VOICE_FILLER_DIR", "out/fillers").strip()
             or "out/fillers"
         )
+        # The waiting signal while pi thinks: one fixed phrase, no variants,
+        # synthesized at runtime with the active (free) TTS provider. Empty
+        # string = fall back to pre-generated clips in voice_filler_dir.
+        voice_filler_text = environment.get(
+            "TEACHING_AGENT_VOICE_FILLER_TEXT", "Loading an answer."
+        ).strip()
+        try:
+            voice_filler_interval_seconds = float(
+                environment.get("TEACHING_AGENT_VOICE_FILLER_INTERVAL_SECONDS", "2").strip()
+            )
+        except ValueError as exc:
+            raise ConfigurationError(
+                "TEACHING_AGENT_VOICE_FILLER_INTERVAL_SECONDS must be a number."
+            ) from exc
+        if voice_filler_interval_seconds <= 0:
+            raise ConfigurationError(
+                "TEACHING_AGENT_VOICE_FILLER_INTERVAL_SECONDS must be positive."
+            )
         voice_ptt_token = environment.get("TEACHING_AGENT_VOICE_PTT_TOKEN", "").strip()
         deepgram_api_key = environment.get("DEEPGRAM_API_KEY", "").strip()
         elevenlabs_api_key = environment.get("ELEVENLABS_API_KEY", "").strip()
         if voice_enabled and not deepgram_api_key:
             raise ConfigurationError("DEEPGRAM_API_KEY is required when voice is enabled.")
-        if voice_enabled and not elevenlabs_api_key:
-            raise ConfigurationError("ELEVENLABS_API_KEY is required when voice is enabled.")
-        if voice_enabled and not voice_tts_voice_id:
-            raise ConfigurationError(
-                "TEACHING_AGENT_VOICE_TTS_VOICE_ID is required when voice is enabled."
-            )
+        # Provider-specific requirements only — the default voice (edge) is
+        # free and needs no key; ElevenLabs is the opt-in paid path.
+        if voice_enabled and voice_tts_provider == "elevenlabs":
+            if not elevenlabs_api_key:
+                raise ConfigurationError(
+                    "ELEVENLABS_API_KEY is required when TEACHING_AGENT_VOICE_TTS=elevenlabs."
+                )
+            if not voice_tts_voice_id:
+                raise ConfigurationError(
+                    "TEACHING_AGENT_VOICE_TTS_VOICE_ID is required when "
+                    "TEACHING_AGENT_VOICE_TTS=elevenlabs."
+                )
 
         if log_level not in _VALID_LOG_LEVELS:
             raise ConfigurationError(
@@ -215,8 +245,11 @@ class Settings:
             voice_tts_provider=voice_tts_provider,
             voice_tts_voice_id=voice_tts_voice_id,
             voice_tts_model_id=voice_tts_model_id,
+            voice_edge_rate=voice_edge_rate,
             voice_post_transcript=voice_post_transcript,
             voice_filler_dir=voice_filler_dir,
+            voice_filler_text=voice_filler_text,
+            voice_filler_interval_seconds=voice_filler_interval_seconds,
             voice_ptt_token=voice_ptt_token,
             deepgram_api_key=deepgram_api_key,
             elevenlabs_api_key=elevenlabs_api_key,
