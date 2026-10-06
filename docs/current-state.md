@@ -1,6 +1,8 @@
 # Current State
 
-Last updated: 2026-10-05 (later still: lecture episode generated, UNPROBED — `lessons/invariant-and-write-boundary/lecture.md`: targets the 3x-faded names — invariant = the rule (vs atomicity = a mechanism), write boundary = the perimeter of state-changing paths where it's enforced; ties crash windows, transactions, and receipts to the pair; closing drill: ask invariant + write boundary of any unfamiliar system.
+Last updated: 2026-10-06 (recall ping results: invariant + write-boundary names recalled UNAIDED ~3 days after 3 prior fades — sharpening given: atomicity is a guarding MECHANISM, the write boundary is the perimeter of state-changing paths. Crash-window check: learner asked 'what was the crash window one?' — did NOT re-present; re-posed the email-sender question (where the window sits, duplication-vs-loss choice), answer pending. Still owed: crash-window answer, keyed-receipt cold-pseudocode production rep. Model: Alvar (pi).
+
+Prior: 2026-10-05 (later still: lecture episode generated, UNPROBED — `lessons/invariant-and-write-boundary/lecture.md`: targets the 3x-faded names — invariant = the rule (vs atomicity = a mechanism), write boundary = the perimeter of state-changing paths where it's enforced; ties crash windows, transactions, and receipts to the pair; closing drill: ask invariant + write boundary of any unfamiliar system.
 
 Prior: 2026-10-05 (later: lecture episode generated, UNPROBED — `lessons/crash-window-general-form/lecture.md`: crash window as space between two DURABLE steps, the forced duplication-vs-loss choice, learner's own socratic-partner reasoning as transfer proof, two drills for auditing unfamiliar systems. Also UNPROBED: `lessons/keyed-receipt-trick/lecture.md` — the receipt stores the RESULT and the retry must return it. /lecture live-verified in the lab channel this session; remaining: real slash-command UX + phone listen.)
 
