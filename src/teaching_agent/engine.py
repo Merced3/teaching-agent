@@ -348,7 +348,10 @@ class TeachingEngine:
             await self._hub.post_followup(interaction_id, "Not your tutor.", ephemeral=True)
             return True
         if command == "mode":
-            await self._handle_mode(payload)
+            # /mode restarts the pi subprocess and blows the hub's 2.5s
+            # callback budget (ADR 0003), so defer first and do the work
+            # in the background, like the prompt-driven commands below.
+            asyncio.create_task(self._run_mode(payload))
             return True
         if command == "lesson":
             await self._handle_lesson(payload)
@@ -373,6 +376,12 @@ class TeachingEngine:
 
         asyncio.create_task(run())
         return True
+
+    async def _run_mode(self, payload: dict[str, Any]) -> None:
+        try:
+            await self._handle_mode(payload)
+        except Exception:
+            logger.exception("/mode handling failed.")
 
     async def _handle_mode(self, payload: dict[str, Any]) -> None:
         """Flip test mode live: rebuild pi's system prompt and restart the

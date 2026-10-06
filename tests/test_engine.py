@@ -227,8 +227,10 @@ async def test_test_mode_strips_write_tools() -> None:
     assert engine._test_mode is True  # noqa: SLF001
     assert pi.tools == ("read", "grep", "find", "ls")
     await engine.dispatch(command("mode", {"setting": "live"}))
+    await __import__("asyncio").sleep(0)  # /mode defers; let the task run
     assert pi.tools is None
     await engine.dispatch(command("mode", {"setting": "test"}))
+    await __import__("asyncio").sleep(0)
     assert pi.tools == ("read", "grep", "find", "ls")
 
 
