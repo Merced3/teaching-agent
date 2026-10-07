@@ -57,7 +57,7 @@ Socratic Partner asked: *"What counts as retained if the user can't recall on de
 
 Collapse rule (learner-set): if two states ever route to the same action, merge them. The taxonomy serves the loop, never the other way around. The system's real test, per the learner: **does the agent improve the ability to *use* knowledge, not just name it?** Evidence levels track use; these tags only route the next step.
 
-## The agent is a method, not a curriculum (2026-10-07)
+## The agent is a method, not a curriculum (2026-10-06)
 
 The teaching agent must be **discipline-agnostic**: software development, electrical engineering, physics, mathematics — whatever the learner picks next, no standing prompt, doc, or hardcoded content may favor one discipline over another. Domain content lives only in learner-state files (maps/, lessons/, learner.md) accumulated *after the fact*; anything the model reads at boot carries method only.
 
