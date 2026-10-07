@@ -339,7 +339,6 @@ class TeachingEngine:
         """Crash/restart recovery (decision log 2026-10-06): consume
         NEXT-BOOT.md, finish any interrupted CLOSING session, and reattach
         the live OPEN session to its owner."""
-        self._consume_next_boot()
         scan = self._sessions.boot_scan(
             orphan_days=self._settings.session_orphan_days,
             active_lesson_thread=self._lessons.thread_id,
@@ -355,6 +354,11 @@ class TeachingEngine:
             await self._ask_pi_raw(self._settings.discord_channel_id, _CLOSE_RESUME_PROMPT)
             self._sessions.mark_complete(record.id)
             self._current = None
+        # NEXT-BOOT is consumed AFTER the recovery loop: the boot context is
+        # injected into the first prompt of the surviving session, and a
+        # recovery prompt goes to a dying session that gets frozen COMPLETE —
+        # the handoff note must never be spent there.
+        self._consume_next_boot()
         self._pi.session_file = None
         chosen: SessionRecord | None = None
         if self._lessons.thread_id is not None:
@@ -435,9 +439,16 @@ class TeachingEngine:
             if self._current is not None:
                 self._sessions.reassign(self._current.id, lesson_owner(thread_id))
         elif event == "end":
-            # The lesson's session stays COMPLETE and frozen; general chat
-            # continues in a fresh main session.
+            # The lesson's session stays COMPLETE and frozen — so its working
+            # memory is checkpointed to files FIRST (files are long-term
+            # memory; a session frozen without the close checklist discards
+            # whatever it held). Then general chat continues in a fresh main
+            # session.
             if self._current is not None:
+                self._sessions.mark_closing(self._current.id)
+                await self._ask_pi_raw(
+                    self._settings.discord_channel_id, _COMMAND_PROMPTS["close"]
+                )
                 await self._rotate_session(owner=MAIN_OWNER)
 
     async def dispatch(self, payload: dict[str, Any]) -> dict[str, Any] | None:

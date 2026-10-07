@@ -478,3 +478,11 @@ Intervention: New `src/teaching_agent/sessions.py` (SessionRegistry: OPEN → CL
 Evidence: 74 tests green (13 new: registry persistence, orphan aging, boot reattach, interrupted-close finish, /close rotation, lesson claim/retype/end-freeze, NEXT-BOOT single consumption, warn-never-force); ruff clean on touched files. NOT yet evidence: a live crash/restart reattach, a real /close → new_session against the running agent, and the first boot that actually finds a NEXT-BOOT.md (none existed at build time — the 2026-10-06 close predates the convention).
 
 Verdict: built, awaiting live verification. Known follow-up remains sentence-split TTS streaming if lectures feel laggy.
+
+## 2026-10-07 — Session-architecture review fixes: NEXT-BOOT misdirection + lesson-end extraction
+
+Hypothesis (external review of 7be8d2b): two load-bearing gaps. Verdict after re-reading the code: BOTH CONFIRMED and fixed. (1) NEXT-BOOT.md was consumed BEFORE the CLOSING-recovery loop, so a crash mid-/close followed by restart would inject the handoff note into the recovery prompt — spent on the dying session, with the surviving fresh session getting nothing. Fix: consume NEXT-BOOT after the recovery loop so it lands in the first prompt of the session that survives. (2) /lesson end rotated the lesson's session straight to COMPLETE without the closing checklist — unlike /close and the dirty-start auto-close — so ending a lesson without /close discarded its working memory unextracted, the worst case under "files are long-term memory." Fix: lesson end now marks CLOSING, runs the close checklist prompt, then rotates to a fresh main session.
+
+Evidence: 76 tests green (2 new regression tests: handoff note never spent on a dying session and delivered to the survivor; lesson end checkpoints before freezing). Ruff clean on touched files.
+
+Verdict: keep. Both fixes strengthen the same invariant: a session never goes COMPLETE with unextracted working memory, and a handoff note is never delivered to a session that won't survive.

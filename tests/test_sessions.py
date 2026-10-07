@@ -243,6 +243,51 @@ async def test_next_boot_is_consumed_exactly_once(tmp_path) -> None:
     assert "boot context" not in pi.prompt.await_args.args[0]
 
 
+async def test_next_boot_is_never_spent_on_a_dying_session(tmp_path) -> None:
+    """Crash mid-/close leaves a CLOSING session AND a NEXT-BOOT.md. The
+    recovery prompt must go to the dying session bare; the handoff note
+    belongs to the surviving session."""
+    registry = SessionRegistry(tmp_path / "registry.json")
+    record = registry.create(session_file="data/pi-sessions/hung.json", owner=MAIN_OWNER)
+    registry.mark_closing(record.id)
+    knowledge = tmp_path / "kb"
+    (knowledge / "sessions").mkdir(parents=True)
+    (knowledge / "sessions" / "NEXT-BOOT.md").write_text(
+        "owed: invariant names", encoding="utf-8"
+    )
+    engine, hub, pi = make_engine(
+        tmp_path, {"TEACHING_AGENT_KNOWLEDGE_ROOT": str(knowledge)}
+    )
+    await engine.start()
+    recovery_prompt = pi.prompt.await_args.args[0]
+    assert "interrupted mid-close" in recovery_prompt
+    assert "invariant names" not in recovery_prompt  # not spent on the dead
+    # The surviving session's first turn gets the handoff note.
+    await engine.dispatch(message("Alvar, hi"))
+    assert "invariant names" in pi.prompt.await_args.args[0]
+
+
+async def test_lesson_end_checkpoints_before_freezing(tmp_path) -> None:
+    """/lesson end freezes the lesson's session COMPLETE — it must run the
+    closing checklist first, or the working memory is discarded unextracted."""
+    engine, hub, pi = make_engine(tmp_path)
+    await engine.start()
+    hub.create_thread.return_value = {"id": "555"}
+    await engine.dispatch(command("lesson", {"action": "start", "value": "Races"}))
+    await engine.dispatch(message("working on it", thread={"id": "555", "name": "Races"}))
+    pi.prompt.reset_mock()
+    await engine.dispatch(command("lesson", {"action": "end", "value": "done"}))
+    close_prompts = [
+        c.args[0] for c in pi.prompt.await_args_list if "closing checklist" in c.args[0]
+    ]
+    assert len(close_prompts) == 1
+    pi.new_session.assert_awaited_once()  # rotated AFTER the checklist
+    lesson_session = next(
+        r for r in engine._sessions.all() if r.owner == lesson_owner(555)  # noqa: SLF001
+    )
+    assert lesson_session.state == COMPLETE
+
+
 async def test_cost_threshold_warns_but_never_forces_rotation(tmp_path) -> None:
     engine, hub, pi = make_engine(
         tmp_path, {"TEACHING_AGENT_SESSION_COST_WARN_USD": "0.15"}
