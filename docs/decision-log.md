@@ -486,3 +486,13 @@ Hypothesis (external review of 7be8d2b): two load-bearing gaps. Verdict after re
 Evidence: 76 tests green (2 new regression tests: handoff note never spent on a dying session and delivered to the survivor; lesson end checkpoints before freezing). Ruff clean on touched files.
 
 Verdict: keep. Both fixes strengthen the same invariant: a session never goes COMPLETE with unextracted working memory, and a handoff note is never delivered to a session that won't survive.
+
+## 2026-10-07 — Lesson close is human-only: the [lesson: end] directive is dead
+
+Evidence (learner's live lesson, same day): learner said "I grabbed all the juice I wanted out of this lesson" in the thread; pi emitted [lesson: end] on its own judgment, the binding cleared mid-reply, and the thread-bound reply diverted to main — the exact disorganization threads exist to prevent. Learner verdict: "the only way to close a lesson is me manually typing /lesson end."
+
+Change: pi's directive set is now start + milestone only. A stray [lesson: end] line is stripped (never reaches Discord) but ignored — the binding survives and the reply stays in the thread. The system prompt now teaches pi to wrap up conversationally and suggest /lesson end when the learner signals done. Rationale is the same as 2026-10-02 (/lesson commands as deterministic backstop): pi's boundary detection is probabilistic, and an end boundary is destructive in a way a stray start never is — a wrong start costs a stray thread, a wrong end costs the thread binding and the session. Note the asymmetry with /close: /close rotates the pi session but does NOT end the lesson binding; /lesson end does both (checklist → freeze session → clear binding). Only the human triggers either.
+
+Evidence: 76 tests green; the old end-directive test rewritten as a regression test (directive stripped+ignored, reply stays in thread, /lesson end still closes). NOT yet live-verified: next real lesson wrap-up.
+
+Verdict: keep. Boundaries that destroy organization are human-owned; boundaries that merely annotate stay pi-suggestible.

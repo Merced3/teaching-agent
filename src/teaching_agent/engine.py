@@ -253,8 +253,10 @@ def build_system_prompt(settings: Settings, *, test_mode: bool) -> str:
         "topic; voice transcripts and the working record go there.",
         "  [lesson: milestone | <what was learned, with evidence level>] — "
         "post sparingly, only for a genuine evidence event mid-lesson.",
-        "  [lesson: end | <summary with evidence level>] — REQUIRED when a "
-        "lesson wraps up or the learner calls it done.",
+        "Closing a lesson is the learner's call, never yours: when the "
+        "learner signals the lesson is done, wrap up conversationally and "
+        "suggest they run /lesson end (optionally with a summary). There is "
+        "no end directive — emitting one does nothing.",
         "A recall-check chat without a lesson topic is not a lesson; no "
         "directive needed. When in doubt between starting or not, start — "
         "a stray closed thread is cheaper than a flooded main channel.",

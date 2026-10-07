@@ -5,7 +5,13 @@ via the system prompt's channel rules):
 
     [lesson: start | State machines]
     [lesson: milestone | guarded writes recalled unaided]
-    [lesson: end | crash-proofing deep-dive complete, 5/5]
+
+Closing is deliberately NOT a directive. A lesson ends only when the human
+runs /lesson end (decision log 2026-10-07): an end boundary is destructive
+(clears the thread binding mid-conversation, freezing the session and
+diverting the reply to main), and pi's boundary detection is probabilistic —
+the same reason /lesson commands exist as the deterministic backstop
+(2026-10-02). A stray [lesson: end] line is stripped but ignored.
 
 The engine strips those lines before the reply is posted or spoken, and
 this module does the Discord-side work: one thread per lesson named after
@@ -131,7 +137,10 @@ class LessonManager:
             label = f"**{self._topic}:** " if self._topic else ""
             await self._post_milestone(f"📍 {label}{detail or '(milestone)'}")
         elif action == "end":
-            await self.end(detail)
+            # Human-only boundary: stripped above so the learner never sees
+            # it, deliberately not executed. The prompt teaches pi to ask
+            # for /lesson end instead.
+            logger.info("Ignored pi [lesson: end] directive (close is human-only).")
 
     async def _post_milestone(self, text: str) -> None:
         from .hub_client import HubError

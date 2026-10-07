@@ -174,17 +174,29 @@ async def test_transcripts_go_to_active_lesson_thread(tmp_path) -> None:
     assert hub.post_message.await_args.args[0] == 100
 
 
-async def test_lesson_end_posts_milestone_and_clears_state(tmp_path) -> None:
+async def test_pi_end_directive_is_ignored_close_is_human_only(tmp_path) -> None:
+    """A [lesson: end] line from pi is stripped but never executed (decision
+    log 2026-10-07): the binding survives, the reply still lands in the
+    thread, and only /lesson end closes a lesson."""
     state_file = tmp_path / "state.json"
     engine, hub, pi = make_engine({"TEACHING_AGENT_LESSON_STATE_FILE": str(state_file)})
     hub.create_thread.return_value = {"id": "777"}
     pi.prompt.return_value = pi_reply("[lesson: start | State machines]\nBegin.")
     await engine.dispatch(message("Alvar, go"))
-    assert state_file.exists()  # binding persisted (lessons can span days)
     pi.prompt.return_value = pi_reply("[lesson: end | known (explained)]\nWell done.")
-    await engine.dispatch(message("Alvar, that's a wrap"))
-    posted = [c.args[1] for c in hub.post_message.await_args_list]
-    assert any("Lesson complete: State machines** — known (explained)" in t for t in posted)
+    await engine.dispatch(
+        message("Alvar, that's a wrap", thread={"id": "777", "name": "State machines"})
+    )
+    # Binding survives the stray directive...
+    assert engine._lessons.thread_id == 777  # noqa: SLF001
+    assert state_file.exists()
+    # ...and the reply (stripped) still goes to the THREAD, not main.
+    hub.post_message.assert_any_await(777, "Well done.")
+    assert not any(
+        "Lesson complete" in str(c.args[1]) for c in hub.post_message.await_args_list
+    )
+    # The human command still closes it.
+    await engine.dispatch(command("lesson", {"action": "end", "value": "done"}))
     assert engine._lessons.thread_id is None  # noqa: SLF001
     assert not state_file.exists()
 
