@@ -445,3 +445,13 @@ Three learner-reported friction points, one session:
 
 Evidence: 61 tests green; ruff findings unchanged from baseline (9 pre-existing). NOT yet live-verified: edge voice in a real call, filler phrase cadence.
 Verdict: built, awaiting live verification.
+
+## 2026-10-06 — Open "you lead me" drill reps as a session format (observed, n=1)
+
+Context: learner asked for "reps of software dev stuff, let's just go back and forth, you lead me" — no topic picked, no scaffold. Agent led a ~10-turn voice drill on the map edge node unknown-state-after-timeout (webhook chain, then payment-API timeout).
+
+Hypothesis: free-form scenario drilling — one question at a time, verdict-first, learner drives the reasoning — fits the bodybuilding frame (reps) and works in live voice.
+
+Evidence: learner sustained engagement voluntarily across the full drill, produced unaided applications (unweldable outside world, honest unknown-state UX, invariant stated unprompted), said "I don't know" honestly at the frontier, and one real fuzz point surfaced (reached for keyed receipt where no receipt exists yet — receipt-precondition gap, now an owed probe). Ended on learner's terms.
+
+Verdict: keep as an available format, especially for edge nodes with no fresh map needed — the drill itself walked to the frontier (unknown-state-after-timeout is now warm for a future deep-dive). n=1; no scheduling/policy change.
