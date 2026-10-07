@@ -1,5 +1,14 @@
 # Session Handoff
 
+> **Why this file exists (provenance, 2026-08-26; noted 2026-10-07):** it predates
+> the runtime. In the manual era this project was only markdown — the learner
+> pasted the prompt below into a fresh pi session by hand to carry context
+> between lessons (originally anchored on the socratic-partner codebase). The
+> prompt survives because the *runtime* also builds pi's system prompt from
+> this file. If you are a future session wondering whether some section still
+> earns its place: check whether its premise ("a human pastes this") is still
+> true before keeping it. Every doc except the spine is a current best theory.
+
 ## Opening a new session — paste this
 
 ```text

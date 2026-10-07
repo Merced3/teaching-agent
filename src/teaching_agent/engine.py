@@ -28,6 +28,7 @@ from .lectures import (
 )
 from .lessons import LessonManager
 from .pi_rpc import PiRpcClient, PiRpcError
+from .sessions import MAIN_OWNER, SessionRecord, SessionRegistry, lesson_owner
 from .voice.conversation import TranscriptSink
 from .voice.runtime import VoiceError, VoiceRuntime
 
@@ -184,6 +185,17 @@ _LECTURE_RECORD_PROMPT = (
 _TEST_MODE_TOOLS = ("read", "grep", "find", "ls")
 
 
+# Session-lifecycle prompts (decision log 2026-10-06). /close is the
+# canonical session boundary: pi runs the closing checklist, then the
+# engine rotates to a fresh session (cost per turn resets to baseline).
+_CLOSE_RESUME_PROMPT = (
+    "Boot recovery: the previous session was interrupted mid-close (state "
+    "CLOSING in the session registry). Finish the closing checklist from "
+    "docs/session-handoff.md now — update the knowledge base and commit — "
+    "then confirm briefly what you wrote."
+)
+
+
 def build_system_prompt(settings: Settings, *, test_mode: bool) -> str:
     """The teacher's standing orders: the handoff protocol plus channel context."""
     handoff_path = settings.knowledge_root / "docs" / "session-handoff.md"
@@ -206,6 +218,10 @@ def build_system_prompt(settings: Settings, *, test_mode: bool) -> str:
         "first, one idea at a time, short by default.",
         "- Your final assistant text each turn is posted verbatim to Discord. "
         "Never include internal notes in it.",
+        "- A message may begin with a [boot context — sessions/NEXT-BOOT.md] "
+        "block: that is the previous session's handoff note. Read it FIRST, "
+        "before docs/current-state.md — the owed recall checks in it are the "
+        "easiest thing to drop between sessions.",
         "- Git-commit knowledge-base changes at session close.",
         "- You teach, you do not build: your write/edit tools only reach the "
         "knowledge base (docs/, maps/, sessions/, lessons/) and your shell is "
@@ -277,8 +293,18 @@ class TeachingEngine:
         self._test_mode = settings.test_mode
         self._last_voice_channel_id: int | None = None
         self._pi.tools = _TEST_MODE_TOOLS if self._test_mode else None
+        # Session architecture (decision log 2026-10-06): a persisted
+        # registry of pi sessions (OPEN -> CLOSING -> COMPLETE). Sessions
+        # are working memory; files are long-term memory.
+        self._sessions = SessionRegistry(settings.session_registry_file)
+        self._current: SessionRecord | None = None
+        self._cost_warned: set[str] = set()
+        self._boot_context: str | None = None
         self._lessons = LessonManager(
-            hub, settings.discord_channel_id, settings.lesson_state_file
+            hub,
+            settings.discord_channel_id,
+            settings.lesson_state_file,
+            on_boundary=self._on_lesson_boundary,
         )
         # Audio render is injectable so tests never shell out to TTS.
         self._render_audio = render_lecture_audio
@@ -307,6 +333,112 @@ class TeachingEngine:
                 raise
         await self._hub.put_commands(self._settings.callback_url, _COMMANDS)
         logger.info("Slash commands synced.")
+        await self._boot_sessions()
+
+    async def _boot_sessions(self) -> None:
+        """Crash/restart recovery (decision log 2026-10-06): consume
+        NEXT-BOOT.md, finish any interrupted CLOSING session, and reattach
+        the live OPEN session to its owner."""
+        self._consume_next_boot()
+        scan = self._sessions.boot_scan(
+            orphan_days=self._settings.session_orphan_days,
+            active_lesson_thread=self._lessons.thread_id,
+        )
+        for record in scan.closing:
+            # Resume only to finish the close checklist, then COMPLETE.
+            logger.info("Finishing interrupted close of session %s.", record.id)
+            self._pi.session_file = record.session_file
+            await self._pi.close()
+            # Treat the closing session as current so its turns register on
+            # it instead of spawning a fresh OPEN record.
+            self._current = record
+            await self._ask_pi_raw(self._settings.discord_channel_id, _CLOSE_RESUME_PROMPT)
+            self._sessions.mark_complete(record.id)
+            self._current = None
+        self._pi.session_file = None
+        chosen: SessionRecord | None = None
+        if self._lessons.thread_id is not None:
+            chosen = self._sessions.find_by_owner(lesson_owner(self._lessons.thread_id))
+        if chosen is None:
+            chosen = self._sessions.find_by_owner(MAIN_OWNER)
+        if chosen is not None:
+            self._current = chosen
+            self._pi.session_file = chosen.session_file
+            logger.info("Reattached session %s (owner=%s).", chosen.id, chosen.owner)
+
+    def _consume_next_boot(self) -> None:
+        """NEXT-BOOT.md is consumed exactly once (session-handoff.md step 6):
+        read, held for injection into the first prompt of the new session,
+        then renamed so it can never be consumed twice."""
+        path = self._settings.knowledge_root / "sessions" / "NEXT-BOOT.md"
+        try:
+            text = path.read_text(encoding="utf-8").strip()
+        except OSError:
+            return
+        if not text:
+            return
+        self._boot_context = text
+        with suppress(OSError):
+            path.rename(path.with_name(f"NEXT-BOOT.consumed-{date.today().isoformat()}.md"))
+        logger.info("Consumed sessions/NEXT-BOOT.md (%d chars).", len(text))
+
+    def _sync_session(self, result: Any) -> None:
+        """After each pi turn: adopt a session file into the registry (first
+        turn of a fresh session) or record the turn on the current one."""
+        if self._current is None:
+            owner = (
+                lesson_owner(self._lessons.thread_id)
+                if self._lessons.thread_id is not None
+                else MAIN_OWNER
+            )
+            self._current = self._sessions.create(
+                session_file=result.session_file, owner=owner
+            )
+        # Every completed turn counts — including the first one.
+        self._sessions.touch(
+            self._current.id, session_file=result.session_file, cost=result.cost
+        )
+
+    async def _rotate_session(self, owner: str | None = None) -> None:
+        """The /close boundary: the old session is COMPLETE (immutable — a
+        closed lesson is revisited through its knowledge-base artifacts,
+        never by resuming its transcript) and a fresh OPEN session starts.
+        `owner=None` keeps the old session's owner."""
+        if owner is None and self._current is not None:
+            owner = self._current.owner
+        if self._current is not None:
+            self._sessions.mark_complete(self._current.id)
+        state = await self._pi.new_session()
+        session_file = state.get("sessionFile")
+        self._current = self._sessions.create(
+            session_file=session_file if isinstance(session_file, str) else None,
+            owner=owner or MAIN_OWNER,
+        )
+        logger.info("Rotated to fresh session %s (owner=%s).",
+                    self._current.id, self._current.owner)
+
+    async def _on_lesson_boundary(self, event: str, thread_id: int | None) -> None:
+        """Lesson start/end own session boundaries (decision log 2026-10-06):
+        a lesson owns its session id for its lifetime; /voice, /mode and
+        /lecture never do."""
+        if event == "start" and thread_id is not None:
+            if self._current is not None and self._current.turns > 0:
+                # Dirty session: auto-close first, then the fresh session
+                # belongs to the new lesson.
+                logger.info("Auto-closing dirty session %s before lesson start.",
+                            self._current.id)
+                self._sessions.mark_closing(self._current.id)
+                await self._ask_pi_raw(
+                    self._settings.discord_channel_id, _COMMAND_PROMPTS["close"]
+                )
+                await self._rotate_session()
+            if self._current is not None:
+                self._sessions.reassign(self._current.id, lesson_owner(thread_id))
+        elif event == "end":
+            # The lesson's session stays COMPLETE and frozen; general chat
+            # continues in a fresh main session.
+            if self._current is not None:
+                await self._rotate_session(owner=MAIN_OWNER)
 
     async def dispatch(self, payload: dict[str, Any]) -> dict[str, Any] | None:
         if payload.get("type") == "command":
@@ -382,10 +514,21 @@ class TeachingEngine:
         channel_id = int(payload.get("channel_id"))
 
         async def run() -> None:
+            if command == "close" and self._current is not None:
+                # Enter CLOSING before the checklist runs: if the process
+                # dies here, boot recovery resumes the close instead of
+                # silently keeping the session OPEN.
+                self._sessions.mark_closing(self._current.id)
             reply = await self._ask_pi(channel_id, prompt)
             await self._hub.post_followup(
                 interaction_id, reply or "(nothing to say)", ephemeral=False
             )
+            if command == "close":
+                # Only the session's owner drives it to CLOSING/COMPLETE —
+                # and /close is a command (not a voice turn), so the owner
+                # check is structural: a voice turn can never close a
+                # lesson's session.
+                await self._rotate_session()
 
         asyncio.create_task(run())
         return True
@@ -717,7 +860,17 @@ class TeachingEngine:
         except HubError:
             logger.debug("Typing indicator failed; continuing.", exc_info=True)
         try:
-            result = await self._pi.prompt(f"[date: {date.today().isoformat()}] {prompt}")
+            prompt_text = prompt
+            if self._boot_context is not None:
+                prompt_text = (
+                    "[boot context — sessions/NEXT-BOOT.md, read this FIRST "
+                    "before anything else]:\n" + self._boot_context
+                    + "\n\n" + prompt
+                )
+                self._boot_context = None
+            result = await self._pi.prompt(
+                f"[date: {date.today().isoformat()}] {prompt_text}"
+            )
         except PiRpcError as exc:
             logger.exception("Pi run failed.")
             return f"(teacher brain hiccuped: {exc})"
@@ -725,4 +878,26 @@ class TeachingEngine:
             "Pi run: model=%s/%s cost=$%.4f",
             result.provider, result.model_id, result.cost,
         )
+        self._sync_session(result)
+        await self._maybe_warn_cost(channel_id)
         return result.text
+
+    async def _maybe_warn_cost(self, channel_id: int) -> None:
+        """A token/$ threshold WARNS but never force-resets mid-lesson —
+        amputating a live Socratic thread is worse than the spend
+        (decision log 2026-10-06). One warning per session."""
+        current = self._current
+        if (
+            current is None
+            or current.id in self._cost_warned
+            or current.cost_usd < self._settings.session_cost_warn_usd
+        ):
+            return
+        self._cost_warned.add(current.id)
+        with suppress(HubError):
+            await self._hub.post_message(
+                channel_id,
+                f"(💸 this session has spent ${current.cost_usd:.2f} across "
+                f"{current.turns} turns — /close starts a fresh, cheap one "
+                "when you reach a natural stop. I'll never force it mid-lesson.)",
+            )

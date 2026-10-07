@@ -41,6 +41,9 @@ class Settings:
     recall_pings_enabled: bool
     text_require_address: bool
     lesson_state_file: Path
+    session_registry_file: Path
+    session_orphan_days: int
+    session_cost_warn_usd: float
     recall_check_interval_seconds: int
     lecture_public_url: str
     lecture_tts: str
@@ -114,6 +117,25 @@ class Settings:
             ).strip()
             or "data/lesson-state.json"
         )
+        # Session registry (decision log 2026-10-06): persisted OPEN ->
+        # CLOSING -> COMPLETE lifecycle so crash/restart reattaches owners.
+        session_registry_file = Path(
+            environment.get(
+                "TEACHING_AGENT_SESSION_REGISTRY_FILE", "data/session-registry.json"
+            ).strip()
+            or "data/session-registry.json"
+        )
+        session_orphan_days = _positive_int_with_default(
+            environment, "TEACHING_AGENT_SESSION_ORPHAN_DAYS", default=7
+        )
+        try:
+            session_cost_warn_usd = float(
+                environment.get("TEACHING_AGENT_SESSION_COST_WARN_USD", "2.0").strip()
+            )
+        except ValueError as exc:
+            raise ConfigurationError(
+                "TEACHING_AGENT_SESSION_COST_WARN_USD must be a number."
+            ) from exc
         recall_check_interval_seconds = _positive_int_with_default(
             environment, "TEACHING_AGENT_RECALL_CHECK_INTERVAL_SECONDS", default=3600
         )
@@ -232,6 +254,9 @@ class Settings:
             recall_pings_enabled=recall_pings_enabled,
             text_require_address=text_require_address,
             lesson_state_file=lesson_state_file,
+            session_registry_file=session_registry_file,
+            session_orphan_days=session_orphan_days,
+            session_cost_warn_usd=session_cost_warn_usd,
             recall_check_interval_seconds=recall_check_interval_seconds,
             lecture_public_url=lecture_public_url,
             lecture_tts=lecture_tts,

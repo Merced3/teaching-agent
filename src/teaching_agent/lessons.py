@@ -25,9 +25,11 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from .hub_client import HubClient
 
 logger = logging.getLogger(__name__)
@@ -40,10 +42,21 @@ _DIRECTIVE = re.compile(
 class LessonManager:
     """Owns the active lesson thread and the main-channel milestone posts."""
 
-    def __init__(self, hub: HubClient, channel_id: int, state_file: Path) -> None:
+    def __init__(
+        self,
+        hub: HubClient,
+        channel_id: int,
+        state_file: Path,
+        on_boundary: Callable[[str, int | None], Awaitable[Any]] | None = None,
+    ) -> None:
         self._hub = hub
         self._channel_id = channel_id
         self._state_file = state_file
+        # Session-architecture hook (decision log 2026-10-06): the engine
+        # owns pi session lifecycles; lesson start/end are the boundaries
+        # that re-type or rotate them. Pure transport here — the callback
+        # is the engine's seam.
+        self._on_boundary = on_boundary
         self._thread_id: int | None = None
         self._topic: str | None = None
         self._load()
@@ -86,6 +99,7 @@ class LessonManager:
             f"📘 **Lesson started: {topic}** — the running record lives in the thread."
         )
         logger.info("Lesson started: %r (thread %s).", topic, self._thread_id)
+        await self._notify_boundary("start", self._thread_id)
         return f"Lesson started: **{topic}** — transcripts and the record go to the thread."
 
     async def end(self, summary: str = "") -> str:
@@ -99,6 +113,7 @@ class LessonManager:
         self._topic = None
         self._save()
         logger.info("Lesson ended: %r.", topic)
+        await self._notify_boundary("end", None)
         return f"Lesson complete: **{topic}**."
 
     def describe(self) -> str:
@@ -125,6 +140,14 @@ class LessonManager:
             await self._hub.post_message(self._channel_id, text)
         except HubError:
             logger.warning("Milestone post failed: %.60s", text, exc_info=True)
+
+    async def _notify_boundary(self, event: str, thread_id: int | None) -> None:
+        if self._on_boundary is None:
+            return
+        try:
+            await self._on_boundary(event, thread_id)
+        except Exception:
+            logger.exception("Lesson boundary hook failed: %s", event)
 
     def _load(self) -> None:
         try:

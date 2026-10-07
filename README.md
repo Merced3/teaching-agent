@@ -2,6 +2,8 @@
 
 A personal system for getting brought up to speed on anything, and staying current as it changes. One learner, one trusted interface, many verified sources.
 
+**The opposite of brain rot.** Feeds give you content that washes over you and leaves nothing behind. This system is built so nothing washes over you: everything you consume gets stress-tested — retrieval, application, unannounced re-testing weeks later — and only what survives the stress counts as *known*. Evidence levels are recorded honestly; fluency is never mistaken for retention. Where brain rot optimizes for time-on-feed, this optimizes for durable capability per minute of effort.
+
 **Start here:** `AGENTS.md`, then `docs/thesis.md`. **New session?** Use the prompt in `docs/session-handoff.md`.
 
 ## Layout
