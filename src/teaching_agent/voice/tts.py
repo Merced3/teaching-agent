@@ -18,6 +18,7 @@ from collections.abc import AsyncIterator, Callable
 
 import edge_tts
 import httpx
+import miniaudio
 
 from .pcm import mono_24k_to_stereo_48k
 
@@ -89,10 +90,12 @@ class EdgeTTS(TTSProvider):
     """Microsoft Edge neural voices via edge-tts — free, no API key.
 
     Still a cloud service (Microsoft's), but costs nothing and sounds far
-    more human than the fully-local options we have on Windows. Streams
-    raw s16le 24 kHz mono PCM, same shape as the ElevenLabs provider, so
-    the conversation layer cannot tell the difference. Voice identity is
-    a voice NAME (e.g. en-US-AndrewNeural), swappable live via /voice.
+    more human than the fully-local options we have on Windows. edge-tts
+    7.x only streams mp3 (24 kHz mono, no raw-PCM output format exists),
+    so each utterance is buffered, decoded to s16le 24 kHz mono via
+    miniaudio, and handed to the conversation layer in the same shape the
+    ElevenLabs provider produces. Voice identity is a voice NAME (e.g.
+    en-US-AndrewNeural), swappable live via /voice.
     """
 
     def __init__(self, *, voice_id: str, rate: str = "+0%") -> None:
@@ -100,29 +103,30 @@ class EdgeTTS(TTSProvider):
         self.rate = rate
 
     async def stream_hub_pcm(self, text: str) -> AsyncIterator[bytes]:
-        communicate = edge_tts.Communicate(
-            text,
-            voice=self.voice_id,
-            rate=self.rate,
-            output_format="raw-24khz-16bit-mono-pcm",
-        )
-        pending = b""
+        communicate = edge_tts.Communicate(text, voice=self.voice_id, rate=self.rate)
+        mp3 = bytearray()
         try:
             async for message in communicate.stream():
-                if message.get("type") != "audio":
-                    continue
-                pending += message["data"]
-                # s16le samples are 2 bytes; never split a sample.
-                whole = pending[: len(pending) // 2 * 2]
-                pending = pending[len(whole) :]
-                if whole:
-                    yield mono_24k_to_stereo_48k(whole)
-            if pending:
-                yield mono_24k_to_stereo_48k(pending + b"\x00")
-        except TTSError:
-            raise
+                if message.get("type") == "audio":
+                    mp3 += message["data"]
         except Exception as exc:
             raise TTSError(f"edge-tts failed: {exc}") from exc
+        if not mp3:
+            raise TTSError("edge-tts returned no audio")
+        try:
+            decoded = miniaudio.decode(
+                bytes(mp3), miniaudio.SampleFormat.SIGNED16, 1, 24000
+            )
+        except Exception as exc:
+            raise TTSError(f"edge-tts mp3 decode failed: {exc}") from exc
+        pcm = decoded.samples.tobytes()
+        # Yield in ~85 ms slices (8192 bytes of s16le 24 kHz mono) so
+        # barge-in bookkeeping stays granular. Never split a 2-byte sample.
+        for offset in range(0, len(pcm), 8192):
+            chunk = pcm[offset : offset + 8192]
+            if len(chunk) % 2:
+                chunk += b"\x00"
+            yield mono_24k_to_stereo_48k(chunk)
 
 
 TTS_PROVIDERS: dict[str, Callable[..., TTSProvider]] = {
