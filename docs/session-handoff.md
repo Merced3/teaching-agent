@@ -29,7 +29,8 @@ Today's goal: <one sentence>
 3. Append any experiments or approach changes to `docs/decision-log.md`.
 4. If any taught claim is time-sensitive, note its `current as of` date.
 5. Record the next delayed-recall check that is owed, and when.
-6. Leave the folder resumable by a different model with zero access to this conversation.
+6. Write `sessions/NEXT-BOOT.md` (≤10 lines, consumed once): current date, one-line learner state, owed recall checks with due dates, active lesson/thread if any, next milestone. The next fresh session reads this FIRST (before current-state.md) — the recall-check queue is the easiest thing to drop between sessions and pedagogically the most important. After it is read, the file is renamed/deleted so it cannot be consumed twice.
+7. Leave the folder resumable by a different model with zero access to this conversation.
 
 ## Date awareness (learner rule, 2026-09-16)
 

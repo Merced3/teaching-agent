@@ -57,6 +57,18 @@ Socratic Partner asked: *"What counts as retained if the user can't recall on de
 
 Collapse rule (learner-set): if two states ever route to the same action, merge them. The taxonomy serves the loop, never the other way around. The system's real test, per the learner: **does the agent improve the ability to *use* knowledge, not just name it?** Evidence levels track use; these tags only route the next step.
 
+## The agent is a method, not a curriculum (2026-10-07)
+
+The teaching agent must be **discipline-agnostic**: software development, electrical engineering, physics, mathematics — whatever the learner picks next, no standing prompt, doc, or hardcoded content may favor one discipline over another. Domain content lives only in learner-state files (maps/, lessons/, learner.md) accumulated *after the fact*; anything the model reads at boot carries method only.
+
+The line that separates keep from kill:
+
+- **Domain content in standing context = bug.** It biases every future discipline and rots.
+- **Pedagogical method is not domain content.** Probe-first, evidence levels, spaced recall, verdict cards, "never teach from assumption" — that is how to teach *any* mind *anything*, and it stays.
+- **learner.md stays.** It models the learner's mind (what fades, what lands), which is discipline-agnostic by nature. Subject-specific claims appearing in it are drift.
+
+Corollary on memory: **files are long-term memory; sessions are working memory.** A closed unit of work leaves its value in the knowledge base; the session transcript that produced it is disposable.
+
 ## Working hypotheses (to be tested, not believed)
 
 1. **H1 — Audio is orientation, not retention.** Long audio lessons build vocabulary and a map, but do not produce durable recall without retrieval practice. *(Basis: learner's own report that audio "wasn't a good way to retain." Evidence: pending.)*
