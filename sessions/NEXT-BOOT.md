@@ -1,5 +1,5 @@
-Current date: 2026-10-07
-Learner state: five-node deep-dive complete; retention engine active; keyed-receipt preconditions taught today (derived unaided).
-Owed recall checks: (1) five-question audit cold re-ping ~2026-10-10..14 (Q2–Q5 faded at 1 day, Q1 held); (2) precondition + reconciliation-job names ~2026-10-10..14 — fold into the same ping.
-Active thread: none open. Consolidation lecture episode now PROBED (split result, see current-state 2026-10-07 latest entry).
-Next milestone: learner decision — next deep-dive strand (unknown-state-after-timeout / backoff / testing) or consolidation project.
+Current date: 2026-10-08
+Learner state: five-node arc holding; transferring mechanisms fast (receipt → timeout scenario unaided); names still the weak layer.
+Owed recall checks: five-question audit Q2–Q5 + precondition/reconciliation names, due ~2026-10-10..14.
+Active thread: unknown-state-after-timeout lesson OPEN (thread started 10-08) — re-open with the probe: "how do you confirm the charge happened? You wrote a record before the call — what's in it, and who else knows about it?" Session log: sessions/2026-10-08-timeout-lesson-opened.md.
+Next milestone: finish the timeout strand (query-provider-by-action-ID + reconciliation), then learner picks next strand or consolidation project.
