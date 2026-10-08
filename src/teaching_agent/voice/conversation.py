@@ -27,6 +27,7 @@ import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
+from uuid import uuid4
 
 import websockets
 
@@ -34,7 +35,7 @@ from .pcm import stereo_48k_to_mono_16k
 from .ptt import RemotePTT
 from .stt import STTProvider
 from .transport import VoiceTransport
-from .tts import TTSProvider
+from .tts import TTSError, TTSProvider
 
 logger = logging.getLogger(__name__)
 
@@ -44,15 +45,16 @@ _MAX_LEAD_SECONDS = 0.300  # stay this far ahead of playback (bounds barge-in la
 
 AskPi = Callable[[str], Awaitable[str | None]]
 
-# The transcript is an auditable log of what actually happened, not a
-# merged summary: the learner's words post the moment a turn fires (so a
-# turn that gets interrupted still appears), the reply posts after it is
-# spoken (with a cut-off marker if the learner barged in), and a turn the
-# learner interrupted before the agent answered gets an explicit
-# "unanswered" note. Three small messages, no character-limit squeeze.
+"""The transcript is an auditable log of what actually happened. The
+learner's words post the moment a turn fires, and the reply posts the
+moment pi answers — BEFORE speech synthesis, so a TTS failure can never
+silently swallow a turn (edge-tts NoAudioReceived, 2026-10-08). Speaking
+the reply and recording it are decoupled: a cut-off or a synth failure is
+a follow-up notice, not a lost message."""
 OnLearner = Callable[[str], Awaitable[None]]
 OnReply = Callable[[str, float | None], Awaitable[None]]  # seconds heard; None = full
 OnUnanswered = Callable[[str], Awaitable[None]]
+OnNotice = Callable[[str], Awaitable[None]]  # operational notes (cut-off, synth failure)
 
 
 @dataclass(frozen=True)
@@ -60,6 +62,7 @@ class TranscriptSink:
     learner: OnLearner
     reply: OnReply
     unanswered: OnUnanswered
+    notice: OnNotice | None = None
 
 _FILLER_DELAY_SECONDS = 2.0  # pi silence this long -> first filler
 _FILLER_INTERVAL_SECONDS = 2.0  # then repeat at this interval until pi answers
@@ -344,16 +347,39 @@ class VoiceConversation:
                     await sink.unanswered(learner_text)
                 return
             self._shelved.clear()  # answered: the shelf is discharged
+            # Post the reply text FIRST — the record exists the moment pi
+            # answers, decoupled from whether speech synthesis survives.
+            if sink is not None:
+                await sink.reply(reply, None)
             heard_box = [0.0]  # seconds of reply audio actually played
             try:
                 await self._speak(generation, reply, heard_box)
             except asyncio.CancelledError:
-                if sink is not None:
-                    await sink.reply(reply, heard_box[0])
+                if sink is not None and sink.notice is not None:
+                    await sink.notice(
+                        f"✂️ cut off — you interrupted ~{heard_box[0]:.0f}s "
+                        "into the spoken reply; the full text is above"
+                    )
                 raise
-            heard = None if generation == self._generation else heard_box[0]
-            if sink is not None:
-                await sink.reply(reply, heard)
+            except TTSError:
+                # Voice died after retries; the learner still has the text.
+                # The incident id ties this Discord note to the log entry.
+                incident = uuid4().hex[:8]
+                logger.error(
+                    "Voice turn %d TTS failed (incident %s).", generation, incident,
+                    exc_info=True,
+                )
+                if sink is not None and sink.notice is not None:
+                    await sink.notice(
+                        "⚠️ voice synth failed after retries — the reply above "
+                        f"is text-only (incident {incident})"
+                    )
+                return
+            if generation != self._generation and sink is not None and sink.notice is not None:
+                await sink.notice(
+                    f"✂️ cut off — you interrupted ~{heard_box[0]:.0f}s "
+                    "into the spoken reply; the full text is above"
+                )
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -395,7 +421,7 @@ class VoiceConversation:
             while not ask.done():
                 try:
                     await asyncio.wait_for(asyncio.shield(ask), timeout=delay)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     if generation != self._generation:
                         break
                     clip = await self._next_filler(index)

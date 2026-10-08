@@ -41,6 +41,7 @@ class Settings:
     recall_pings_enabled: bool
     text_require_address: bool
     lesson_state_file: Path
+    lesson_kickoff: bool
     session_registry_file: Path
     session_orphan_days: int
     session_cost_warn_usd: float
@@ -116,6 +117,12 @@ class Settings:
                 "TEACHING_AGENT_LESSON_STATE_FILE", "data/lesson-state.json"
             ).strip()
             or "data/lesson-state.json"
+        )
+        # Lesson kickoff: on lesson start (directive OR /lesson start),
+        # backfill the lesson-owned session with a pi-written WHY/WHAT
+        # brief, posted as the thread's first message.
+        lesson_kickoff = _parse_bool(
+            environment.get("TEACHING_AGENT_LESSON_KICKOFF", "true")
         )
         # Session registry (decision log 2026-10-06): persisted OPEN ->
         # CLOSING -> COMPLETE lifecycle so crash/restart reattaches owners.
@@ -254,6 +261,7 @@ class Settings:
             recall_pings_enabled=recall_pings_enabled,
             text_require_address=text_require_address,
             lesson_state_file=lesson_state_file,
+            lesson_kickoff=lesson_kickoff,
             session_registry_file=session_registry_file,
             session_orphan_days=session_orphan_days,
             session_cost_warn_usd=session_cost_warn_usd,

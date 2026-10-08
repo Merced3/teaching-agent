@@ -13,6 +13,7 @@ voice-id swap, not a code change.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator, Callable
 
@@ -102,17 +103,43 @@ class EdgeTTS(TTSProvider):
         self.voice_id = voice_id
         self.rate = rate
 
+    # edge-tts's cloud endpoint occasionally returns an empty stream
+    # (NoAudioReceived) with no change on our side — a transient blip,
+    # not a parameter problem (first seen 2026-10-08). Synthesis of the
+    # same text is idempotent, so retry with a fresh Communicate before
+    # giving up; the conversation layer still gets a text fallback if
+    # every attempt fails.
+    _ATTEMPTS = 3
+    _RETRY_BASE_SECONDS = 1.0
+
     async def stream_hub_pcm(self, text: str) -> AsyncIterator[bytes]:
-        communicate = edge_tts.Communicate(text, voice=self.voice_id, rate=self.rate)
         mp3 = bytearray()
-        try:
-            async for message in communicate.stream():
-                if message.get("type") == "audio":
-                    mp3 += message["data"]
-        except Exception as exc:
-            raise TTSError(f"edge-tts failed: {exc}") from exc
-        if not mp3:
-            raise TTSError("edge-tts returned no audio")
+        last_error: Exception | None = None
+        for attempt in range(1, self._ATTEMPTS + 1):
+            communicate = edge_tts.Communicate(
+                text, voice=self.voice_id, rate=self.rate
+            )
+            mp3 = bytearray()
+            try:
+                async for message in communicate.stream():
+                    if message.get("type") == "audio":
+                        mp3 += message["data"]
+            except Exception as exc:
+                last_error = exc
+            if mp3:
+                last_error = None
+                break
+            last_error = last_error or TTSError("edge-tts returned no audio")
+            logger.warning(
+                "edge-tts attempt %d/%d produced no audio: %s",
+                attempt, self._ATTEMPTS, last_error,
+            )
+            if attempt < self._ATTEMPTS:
+                await asyncio.sleep(self._RETRY_BASE_SECONDS * attempt)
+        if last_error is not None or not mp3:
+            raise TTSError(
+                f"edge-tts failed after {self._ATTEMPTS} attempts: {last_error}"
+            ) from last_error
         try:
             decoded = miniaudio.decode(
                 bytes(mp3), miniaudio.SampleFormat.SIGNED16, 1, 24000

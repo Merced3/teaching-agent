@@ -17,6 +17,7 @@ import re
 from contextlib import suppress
 from datetime import date
 from typing import Any
+from uuid import uuid4
 
 from .config import Settings
 from .hub_client import HubClient, HubError
@@ -176,6 +177,22 @@ _LECTURE_RECORD_PROMPT = (
     "files and the current-state update to git — the intake record is "
     "durable evidence and should not wait for session close. Reply with "
     "exactly: SILENT"
+)
+
+# Lesson kickoff (2026-10-08): a lesson start backfills the fresh session
+# with its own WHY/WHAT — the learner should never have to hand-author the
+# context a lesson needs. Pi writes the brief (grounded in the maps, per the
+# freshness rule), it posts as the first message of the thread (the audit
+# trail), and because pi WROTE it, the context is in the lesson-owned
+# session's working memory for free.
+_LESSON_KICKOFF_PROMPT = (
+    "A lesson thread just opened for the topic: {topic}. Write the lesson "
+    "brief that opens this thread: WHY this lesson now — which edge of the "
+    "learner's it addresses, per the maps in maps/ and docs/current-state.md "
+    "(re-read them this turn; the freshness rule applies) — and WHAT it will "
+    "cover, concretely. Plain language, a few sentences, conversational: this "
+    "is posted verbatim as the first message of the lesson thread. No "
+    "directive lines, no headers, no questions yet."
 )
 
 # Test mode is a real boundary: pi runs with read-only tools, so the
@@ -440,6 +457,10 @@ class TeachingEngine:
                 await self._rotate_session()
             if self._current is not None:
                 self._sessions.reassign(self._current.id, lesson_owner(thread_id))
+            if self._settings.lesson_kickoff:
+                # Background: the kickoff is a full pi turn and must not
+                # block the reply/command that carried the lesson start.
+                asyncio.create_task(self._post_lesson_kickoff(thread_id))
         elif event == "end":
             # The lesson's session stays COMPLETE and frozen — so its working
             # memory is checkpointed to files FIRST (files are long-term
@@ -452,6 +473,32 @@ class TeachingEngine:
                     self._settings.discord_channel_id, _COMMAND_PROMPTS["close"]
                 )
                 await self._rotate_session(owner=MAIN_OWNER)
+
+    async def _post_lesson_kickoff(self, thread_id: int) -> None:
+        """The first message of a lesson thread: pi's WHY/WHAT brief. A
+        failure never blocks the lesson — it posts a lookup-able incident
+        id and the learner can just ask for the plan instead."""
+        topic = self._lessons.topic or "this topic"
+        incident = uuid4().hex[:8]
+        reply: str | None = None
+        try:
+            reply = await self._ask_pi(
+                thread_id, _LESSON_KICKOFF_PROMPT.format(topic=topic)
+            )
+        except Exception:
+            logger.exception("Lesson kickoff failed (incident %s).", incident)
+        if reply and not reply.startswith("(teacher brain hiccuped"):
+            with suppress(HubError):
+                await self._hub.post_message(
+                    thread_id, f"📘 **Lesson brief — {topic}**\n{reply}"
+                )
+            return
+        logger.error("Lesson kickoff produced no brief (incident %s).", incident)
+        with suppress(HubError):
+            await self._hub.post_message(
+                thread_id,
+                f"(lesson brief failed — ask me for the plan. incident {incident})",
+            )
 
     async def dispatch(self, payload: dict[str, Any]) -> dict[str, Any] | None:
         if payload.get("type") == "command":
@@ -518,7 +565,11 @@ class TeachingEngine:
             await self._handle_lecture(payload)
             return True
         if command == "voice":
-            await self._handle_voice_command(payload)
+            # Backgrounded like /mode: joining voice (WS connect + STT
+            # start) blows the hub's 2.5s callback budget, which showed up
+            # as interaction-callback timeouts and auto-defers in the hub
+            # log (2026-10-08). Answer fast, work in the background.
+            asyncio.create_task(self._run_voice(payload))
             return True
         prompt = _COMMAND_PROMPTS.get(command)
         if prompt is None:
@@ -551,6 +602,12 @@ class TeachingEngine:
             await self._handle_mode(payload)
         except Exception:
             logger.exception("/mode handling failed.")
+
+    async def _run_voice(self, payload: dict[str, Any]) -> None:
+        try:
+            await self._handle_voice_command(payload)
+        except Exception:
+            logger.exception("/voice handling failed.")
 
     async def _handle_mode(self, payload: dict[str, Any]) -> None:
         """Flip test mode live: rebuild pi's system prompt and restart the
@@ -806,15 +863,16 @@ class TeachingEngine:
         await self._post_transcript_line(f"🎙 **You:** {learner_text}")
 
     async def post_voice_reply(self, reply: str, heard_seconds: float | None) -> None:
-        """The agent's reply after it is spoken. A barge-in adds where the
-        learner cut it off, so the log shows what was never heard."""
-        text = f"🎙 **{self._settings.agent_name}:** {reply}"
-        if heard_seconds is not None:
-            text += (
-                f"\n*(✂️ cut off — you interrupted ~{heard_seconds:.0f}s in; "
-                "the text above is the full reply)*"
-            )
-        await self._post_transcript_line(text)
+        """The agent's reply, posted the moment pi answers — decoupled from
+        speech synthesis, so a TTS failure can never lose the text.
+        heard_seconds is retained for the sink contract; the conversation
+        layer now reports cut-offs via post_voice_notice."""
+        await self._post_transcript_line(f"🎙 **{self._settings.agent_name}:** {reply}")
+
+    async def post_voice_notice(self, text: str) -> None:
+        """Operational notes about a turn (cut-off marker, synth failure
+        with incident id) — small print under the reply they belong to."""
+        await self._post_transcript_line(f"*({text})*")
 
     async def post_voice_unanswered(self, learner_text: str) -> None:
         """The learner interrupted before the agent answered — the log must
@@ -829,6 +887,7 @@ class TeachingEngine:
             learner=self.post_voice_learner,
             reply=self.post_voice_reply,
             unanswered=self.post_voice_unanswered,
+            notice=self.post_voice_notice,
         )
 
     async def _post_transcript_line(self, text: str) -> None:

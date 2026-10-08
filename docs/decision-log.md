@@ -496,3 +496,17 @@ Change: pi's directive set is now start + milestone only. A stray [lesson: end] 
 Evidence: 76 tests green; the old end-directive test rewritten as a regression test (directive stripped+ignored, reply stays in thread, /lesson end still closes). NOT yet live-verified: next real lesson wrap-up.
 
 Verdict: keep. Boundaries that destroy organization are human-owned; boundaries that merely annotate stay pi-suggestible.
+
+## 2026-10-08 — Lesson kickoff brief + voice turn can no longer be swallowed by TTS
+
+Hypothesis: two independent gaps, one pedagogical, one operational. (1) A lesson-owned session starts agnostic, so the lesson's context (WHY this lesson, WHAT it covers) depended on the learner hand-authoring it — and the learner is not a reliable source for that. (2) A voice turn's reply only reached the record AFTER speech synthesis succeeded, so a TTS failure deleted the turn entirely.
+
+Intervention: (1) Lesson kickoff: any lesson start (pi's `[lesson: start]` directive OR `/lesson start` — both flow through `LessonManager.start` → the boundary hook) now fires a background pi turn asking for the WHY/WHAT brief (maps/current-state re-read required, per the freshness rule), posted as the first message of the lesson thread. The session stays agnostic by design — the context is backfilled as its first turn, and because pi WROTE the brief, it sits in the lesson-owned session's working memory for free. Gated by `TEACHING_AGENT_LESSON_KICKOFF` (default true). Failure posts `(lesson brief failed — ask me for the plan. incident <id>)` with the id in the logs, and never blocks the lesson. (2) Voice hardening: edge-tts synthesis is retried idempotently (3 attempts, fresh `Communicate` each, linear backoff — NoAudioReceived is a known transient blip of the free endpoint, observed live this day); the reply TEXT posts to the thread the moment pi answers, decoupled from speech; a cut-off or a final synth failure becomes a follow-up notice (`✂️ cut off ~Ns in` / `⚠️ voice synth failed ... incident <id>`), never a lost message. The reply was always durable in pi's session jsonl, so no retrieval machinery ("keyed receipt") was needed — the fix is never losing it from the record, not getting it back. Evidence that the failure was NOT upstream: hub /messages 201 and /typing 202 in the same seconds; STT merged turn fired correctly.
+
+Evidence: 77 tests green (3 new: barge-in cut-off now a notice after an immediate text post; edge-tts retry exhaustion raises TTSError after exactly 3 attempts; existing sink tests updated to the decoupled contract). NOT yet live-verified: a real edge-tts blip recovering via retry, and the first auto-created lesson thread opening with its brief.
+
+Verdict: keep. Turns are evidence; evidence may degrade (voice → text) but may not vanish.
+
+## 2026-10-08 (addendum) — /voice joins the backgrounded-command pattern
+
+Evidence (hub log, same evening): `/voice` interactions timed out the hub's 2.5s callback budget (`interaction ... callback ... failed; auto-deferring`, TimeoutError) because voice join (WS connect + STT start) was awaited synchronously inside the callback. Auto-defer masked it — no lost work — but it violated the ADR-0003 budget /mode already respects. Fix: `/voice` now defers immediately and works in a background task, same as `/mode`. Regression test updated (followup lands a tick after dispatch). 77 tests green.

@@ -81,6 +81,8 @@ async def test_leaves_when_the_learner_leaves() -> None:
 
 
 async def test_voice_model_failure_is_reported_not_raised() -> None:
+    import asyncio
+
     from teaching_agent.pi_rpc import PiRpcError
 
     engine, hub, pi, _ = make_engine()
@@ -95,7 +97,10 @@ async def test_voice_model_failure_is_reported_not_raised() -> None:
             "options": {"action": "model", "value": "not-a-model"},
         }
     )
+    # /voice is backgrounded (hub 2.5s callback budget): the dispatch
+    # answers immediately, the work and its followup land a tick later.
     assert result == {"defer": True, "ephemeral": False}
+    await asyncio.sleep(0.05)
     hub.post_followup.assert_awaited_once()
     args = hub.post_followup.call_args
     assert "Voice command failed" in args.args[1]
@@ -467,7 +472,10 @@ from teaching_agent.voice.conversation import TranscriptSink  # noqa: E402
 
 
 def make_sink_conversation(ask_pi):
-    sink = TranscriptSink(learner=AsyncMock(), reply=AsyncMock(), unanswered=AsyncMock())
+    sink = TranscriptSink(
+        learner=AsyncMock(), reply=AsyncMock(), unanswered=AsyncMock(),
+        notice=AsyncMock(),
+    )
     tts = AsyncMock()
     conv = VoiceConversation(
         transport=SimpleNamespace(
@@ -541,10 +549,12 @@ async def test_barge_in_marks_where_the_reply_was_cut() -> None:
     task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await task
-    sink.reply.assert_awaited_once()
-    reply_text, heard = sink.reply.await_args.args
-    assert reply_text == "a long reply"
-    assert heard is not None and heard >= 0.0  # cut-off point, not "full"
+    # Decoupled transcript (2026-10-08): the reply text posts the moment pi
+    # answers, and the barge-in cut-off point is a follow-up notice.
+    sink.reply.assert_awaited_once_with("a long reply", None)
+    sink.notice.assert_awaited_once()
+    note = sink.notice.await_args.args[0]
+    assert "cut off" in note
 
 
 async def test_unanswered_words_are_shelved_into_the_next_turn() -> None:
@@ -581,3 +591,41 @@ async def test_unanswered_words_are_shelved_into_the_next_turn() -> None:
     # shelf discharged after the answer
     assert conv._shelved == []  # noqa: SLF001
     sink.reply.assert_awaited_once_with("reply", None)
+
+
+# -- edge-tts retry (NoAudioReceived blip, 2026-10-08) -----------------------
+
+
+async def test_edge_tts_retries_then_raises_after_exhaustion() -> None:
+    """Synthesis of the same text is idempotent: transient empty streams are
+    retried; only total exhaustion raises TTSError (the conversation layer's
+    text fallback then keeps the turn)."""
+    import edge_tts
+    import pytest
+
+    from teaching_agent.voice.tts import EdgeTTS, TTSError
+
+    calls = 0
+
+    class AlwaysEmpty:
+        def __init__(self, *a, **k) -> None: ...
+
+        async def stream(self):
+            nonlocal calls
+            calls += 1
+            raise edge_tts.exceptions.NoAudioReceived("blip")
+            yield  # pragma: no cover - marks this an async generator
+
+    import teaching_agent.voice.tts as tts_mod
+
+    original = tts_mod.edge_tts.Communicate
+    tts_mod.edge_tts.Communicate = AlwaysEmpty
+    try:
+        provider = EdgeTTS(voice_id="en-US-AndrewNeural")
+        provider._RETRY_BASE_SECONDS = 0  # no sleeping in tests  # noqa: SLF001
+        with pytest.raises(TTSError, match="after 3 attempts"):
+            async for _ in provider.stream_hub_pcm("hello"):
+                pass
+        assert calls == 3
+    finally:
+        tts_mod.edge_tts.Communicate = original
