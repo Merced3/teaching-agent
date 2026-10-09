@@ -558,3 +558,15 @@ Intervention: PiRpcClient.abort() (RPC `abort` — kills the run and waits for i
 Evidence: live incident 2026-10-09 (voice turns 5→6, 18:17 UTC); 91 tests green incl. a regression pinning abort-before-next-turn and no-abort-when-clean. Note: turn boundaries on Discord PTT were endpointing+grace (the bot cannot see the key) — the long pause firing early is expected without the remote button; shelved-words already preserves the thought.
 
 Verdict: keep; live-verify with a two-part utterance while a filler is playing.
+
+---
+
+## 2026-10-09 (evening) — Live verification: transport swap, autojoin, exit voice-leave, pause-splitting
+
+Hypothesis: The day's voice work (live transport swap, reconnect ladder, exit voice-leave, abort-on-barge-in) holds up against the real hub + Discord, not just tests.
+
+Intervention: Learner ran the full discord-transport flow after a hub restart: join channel unannounced (no command), two-part utterances with long mid-thought pauses, agent restart mid-voice-session, rejoin after restart.
+
+Evidence (live, verified by the learner): autojoin followed the learner with NO command; courier LEFT voice when the agent process exited (engine.stop works); autojoin worked again after restart into the still-active lesson thread (binding resumed from state file); long pauses split turns early (endpointing + 0.8s grace, expected without remote PTT) but every turn answered — zero "already processing" hiccups; the session produced a real teaching outcome (backoff-vs-jitter split CLOSED unaided, one coached fix: jitter doesn't add wait time). Hub-side noise noted for a discord-hub session: voice_recv logs "unexpected rtcp packet type=200" ~1/s and "WS payload extra keys" per packet at INFO — harmless, should be DEBUG. The abort-on-barge-in path was NOT exercised (pi answered fast enough that turns never overlapped) — still only test-verified.
+
+Verdict: keep all of it. Discord transport is now the field-tested car path; remaining polish is hub-side log levels and the wedge-recovery hardening (hub session).
