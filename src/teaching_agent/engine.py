@@ -15,7 +15,7 @@ import asyncio
 import logging
 import re
 from contextlib import suppress
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -29,6 +29,7 @@ from .lectures import (
 )
 from .lessons import LessonManager
 from .pi_rpc import PiRpcClient, PiRpcError
+from .pings import PingController
 from .sessions import MAIN_OWNER, SessionRecord, SessionRegistry, lesson_owner
 from .voice.conversation import TranscriptSink
 from .voice.runtime import VoiceError, VoiceRuntime
@@ -101,6 +102,21 @@ _COMMANDS = [
         ],
     },
     {
+        # Code-owned like /mode: ping scheduling is logistics, not teaching.
+        # The count is learner-tunable live (data/pings.json), env is only
+        # the boot default (decision-log 2026-10-09 pings redesign).
+        "name": "pings",
+        "description": "Unprompted pings per day: /pings 3, /pings off, /pings status.",
+        "options": [
+            {
+                "name": "setting",
+                "description": "a number (e.g. 3), off, or status",
+                "type": "string",
+                "required": True,
+            }
+        ],
+    },
+    {
         "name": "voice",
         "description": "Voice session control and live provider/model swapping.",
         "options": [
@@ -148,11 +164,17 @@ _COMMAND_PROMPTS = {
 }
 
 _RECALL_TICK_PROMPT = (
-    "This is a scheduled check-in, not a learner message. The [date:] prefix is the "
-    "real current date — compute elapsed time from it. Read docs/current-state.md "
-    "and the relevant session logs. If any recall checks are due or overdue, ask the "
-    "learner ONE of them now, plainly, one new word per sentence, and close with one "
-    "sentence on what comes next after it. If nothing is due, reply with exactly: SILENT"
+    "This is an unprompted ping, not a learner message. The [date:] prefix is the "
+    "real current date — compute elapsed time from it. Read docs/goal.md, "
+    "docs/routing.md, docs/current-state.md, and the relevant session logs, then "
+    "decide by routing priority: (1) if any recall checks are due or overdue, ask "
+    "ONE of them now, plainly, one new word per sentence; (2) else if a `known` "
+    "node's evidence is old, re-verify it with ONE fresh question; (3) else make "
+    "ONE one-line lesson offer at the current edge ('want a lesson on X? reply "
+    "yes') — never TEACH unprompted, teaching starts on the learner's reply. "
+    "Never ping just to engage; every ping is recall, re-verification, or an "
+    "offer. Keep the whole message under 4 sentences. If there is genuinely "
+    "nothing to ask, re-verify, or offer, reply with exactly: SILENT"
 )
 
 _LECTURE_WRITE_PROMPT = (
@@ -330,6 +352,14 @@ class TeachingEngine:
         )
         # Audio render is injectable so tests never shell out to TTS.
         self._render_audio = render_lecture_audio
+        # Unprompted-ping scheduling (decision-log 2026-10-09): N random
+        # times/day in a waking window, count learner-tunable via /pings.
+        self._pings = PingController(
+            settings.pings_state_file,
+            window_start_hour=settings.pings_window_start_hour,
+            window_end_hour=settings.pings_window_end_hour,
+            default_count=settings.pings_per_day,
+        )
 
     async def stop(self) -> None:
         """Graceful exit. Voice first: the voice connection lives in the
@@ -580,6 +610,9 @@ class TeachingEngine:
             return True
         if command == "lesson":
             await self._handle_lesson(payload)
+            return True
+        if command == "pings":
+            await self._handle_pings(payload)
             return True
         if command == "lecture":
             await self._handle_lecture(payload)
@@ -940,12 +973,61 @@ class TeachingEngine:
             logger.debug("Transcript post failed; continuing.", exc_info=True)
 
     async def recall_tick(self) -> None:
-        """Scheduled job: let Pi decide whether a recall check is due."""
+        """Scheduled job: let Pi decide whether a recall check is due. The
+        slot counts as consumed even when pi stays SILENT — an un-fired
+        slot must not turn into a retry-every-minute nag."""
         if not self._settings.recall_pings_enabled:
             return
         reply = await self._ask_pi(self._settings.discord_channel_id, _RECALL_TICK_PROMPT)
+        self._pings.mark_fired()
         if reply and not reply.strip().upper().startswith(_SILENT):
             await self._hub.post_message(self._settings.discord_channel_id, reply)
+
+    def ping_due(self) -> bool:
+        """A scheduled slot has passed and not been fired (main loop's gate)."""
+        return self._pings.due()
+
+    def ping_delay_seconds(self) -> float | None:
+        """Seconds until the next slot; None when pings are off (loop re-checks)."""
+        nxt = self._pings.next_fire()
+        if nxt is None:
+            return None
+        return max(1.0, (nxt - datetime.now()).total_seconds())
+
+    async def _handle_pings(self, payload: dict[str, Any]) -> None:
+        """Live-tune unprompted pings per day — code-owned like /mode."""
+        interaction_id = str(payload.get("interaction_id"))
+        setting = str((payload.get("options") or {}).get("setting") or "").strip().lower()
+        if setting == "status":
+            await self._hub.post_followup(
+                interaction_id, self._pings.describe(), ephemeral=False
+            )
+            return
+        if setting in {"off", "0"}:
+            self._pings.set_count(0)
+            await self._hub.post_followup(
+                interaction_id,
+                "Pings OFF. `/pings <n>` (e.g. /pings 3) turns them back on.",
+                ephemeral=False,
+            )
+            return
+        try:
+            count = int(setting)
+        except ValueError:
+            count = -1
+        if not 1 <= count <= 12:
+            await self._hub.post_followup(
+                interaction_id,
+                "Usage: /pings <1-12>, /pings off, or /pings status",
+                ephemeral=True,
+            )
+            return
+        self._pings.set_count(count)
+        await self._hub.post_followup(
+            interaction_id,
+            f"Pings set to {count}/day. " + self._pings.describe(),
+            ephemeral=False,
+        )
 
     async def ask_pi(self, prompt: str) -> str | None:
         """Public entry for the voice layer: same pi session as text.

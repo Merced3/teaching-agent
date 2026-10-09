@@ -586,3 +586,15 @@ Evidence: learner request 2026-10-09 ("didn't know where else to go" after compl
 Verdict: keep pending first routed session. Watch-for: routing is agent-computed from markdown — if picks feel mechanical or ignore learner interest twice, revisit the rule before automating it.
 
 OUTCOME (2026-10-09 night, same session): learner explicitly approved adding goal.md + routing.md to the AGENTS.md read list — done. Spine otherwise untouched (purpose, loop, meta-rule unchanged; the new docs are inputs, not spine).
+
+---
+
+## 2026-10-09 (night, 2nd entry) — Pings: N random times/day, /pings command, routing-based content
+
+Hypothesis: Randomly-timed pings (thesis H5) at a learner-tunable frequency will get answered more than fixed-interval check-ins; and a ping whose CONTENT follows docs/routing.md (owed recall → aging known re-verification → one-line lesson offer) keeps every unprompted message pedagogical, satisfying goal.md constraint 1. Teaching itself must never start unprompted — an offer starts on the learner's reply, because unprompted lessons are passive intake (presented-only, the brain-rot shape).
+
+Intervention: (1) `src/teaching_agent/pings.py` — PingController draws N random slots/day inside a waking window (default 3, 08:00–23:00, ≥45 min apart), deterministic per (date, count, window) so restarts can't double-fire or skip; state in data/pings.json (last_fired guards same-slot re-fire; missed slots collapse to ONE catch-up ping). (2) `/pings <1-12>|off|status` — code-owned slash command, live, persisted; env `TEACHING_AGENT_PINGS_*` are boot defaults only. (3) `_RECALL_TICK_PROMPT` now follows routing.md: recall → re-verify → one-line offer; SILENT only when genuinely nothing; under 4 sentences. (4) main.py recall loop waits for the next slot (5-min cap so /pings changes land fast). `TEACHING_AGENT_RECALL_CHECK_INTERVAL_SECONDS` deprecated. goal.md constraint 1 refined (learner-approved: offers count as pedagogical). 13 new tests.
+
+Evidence: learner request 2026-10-09 ("3 random times a day... maybe it can be a /command"); design approved before implementation. 111 tests green. NOT yet live-verified (no real /pings command, no real random-slot day run).
+
+Verdict: keep pending live verification: /pings status shows today's remaining slots; a real slot fires and posts (or stays SILENT); /pings off stops them; a missed-slot catch-up fires once after downtime.

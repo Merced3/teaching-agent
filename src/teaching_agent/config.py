@@ -46,6 +46,10 @@ class Settings:
     session_orphan_days: int
     session_cost_warn_usd: float
     recall_check_interval_seconds: int
+    pings_per_day: int
+    pings_window_start_hour: int
+    pings_window_end_hour: int
+    pings_state_file: Path
     lecture_public_url: str
     lecture_tts: str
     lecture_edge_voice: str
@@ -146,6 +150,27 @@ class Settings:
             ) from exc
         recall_check_interval_seconds = _positive_int_with_default(
             environment, "TEACHING_AGENT_RECALL_CHECK_INTERVAL_SECONDS", default=3600
+        )
+        # Unprompted pings: N random times/day inside the waking window
+        # (decision-log 2026-10-09 pings redesign). The env count is only the
+        # boot default — /pings changes it live via the state file.
+        pings_per_day = _positive_int_with_default(
+            environment, "TEACHING_AGENT_PINGS_PER_DAY", default=3
+        )
+        pings_window_start_hour = _positive_int_with_default(
+            environment, "TEACHING_AGENT_PINGS_WINDOW_START_HOUR", default=8
+        )
+        pings_window_end_hour = _positive_int_with_default(
+            environment, "TEACHING_AGENT_PINGS_WINDOW_END_HOUR", default=23
+        )
+        if not 0 <= pings_window_start_hour < pings_window_end_hour <= 24:
+            raise ConfigurationError(
+                "Ping window must satisfy 0 <= START < END <= 24 "
+                f"(got {pings_window_start_hour}–{pings_window_end_hour})."
+            )
+        pings_state_file = Path(
+            environment.get("TEACHING_AGENT_PINGS_STATE_FILE", "data/pings.json").strip()
+            or "data/pings.json"
         )
         # Where generated lecture audio is linked from. The file is served by
         # this agent's own callback server; the default only works on this
@@ -270,6 +295,10 @@ class Settings:
             session_orphan_days=session_orphan_days,
             session_cost_warn_usd=session_cost_warn_usd,
             recall_check_interval_seconds=recall_check_interval_seconds,
+            pings_per_day=pings_per_day,
+            pings_window_start_hour=pings_window_start_hour,
+            pings_window_end_hour=pings_window_end_hour,
+            pings_state_file=pings_state_file,
             lecture_public_url=lecture_public_url,
             lecture_tts=lecture_tts,
             lecture_edge_voice=lecture_edge_voice,

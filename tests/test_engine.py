@@ -23,6 +23,8 @@ ENV = {
     "TEACHING_AGENT_SESSION_REGISTRY_FILE": str(
         Path(tempfile.mkdtemp()) / "registry.json"
     ),
+    # Isolated ping state: /pings tests must never write the real data/pings.json.
+    "TEACHING_AGENT_PINGS_STATE_FILE": str(Path(tempfile.mkdtemp()) / "pings.json"),
 }
 
 
@@ -139,6 +141,44 @@ async def test_strangers_cannot_toggle_mode() -> None:
     await engine.dispatch(command("mode", {"setting": "live"}, user_id="999"))
     pi.close.assert_not_awaited()
     assert engine._test_mode is True  # noqa: SLF001
+
+
+async def test_pings_set_count_and_status() -> None:
+    engine, hub, pi = await _started()
+    await engine.dispatch(command("pings", {"setting": "2"}))
+    assert engine._pings.count() == 2  # noqa: SLF001
+    hub.post_followup.assert_awaited()
+    await engine.dispatch(command("pings", {"setting": "status"}))
+    last = hub.post_followup.await_args.args[1]
+    assert "2/day" in last
+
+
+async def test_pings_off_and_resume() -> None:
+    engine, hub, pi = await _started()
+    await engine.dispatch(command("pings", {"setting": "off"}))
+    assert engine._pings.count() == 0  # noqa: SLF001
+    assert engine.ping_due() is False
+    assert engine.ping_delay_seconds() is None
+    await engine.dispatch(command("pings", {"setting": "4"}))
+    assert engine._pings.count() == 4  # noqa: SLF001
+    assert engine.ping_delay_seconds() is not None
+
+
+async def test_pings_rejects_bad_values() -> None:
+    engine, hub, pi = await _started()
+    before = engine._pings.count()  # noqa: SLF001
+    await engine.dispatch(command("pings", {"setting": "banana"}))
+    assert engine._pings.count() == before  # noqa: SLF001 — unchanged, usage shown
+    hub.post_followup.assert_awaited_with(
+        "i1", "Usage: /pings <1-12>, /pings off, or /pings status", ephemeral=True
+    )
+
+
+async def test_strangers_cannot_change_pings() -> None:
+    engine, hub, pi = await _started()
+    before = engine._pings.count()  # noqa: SLF001
+    await engine.dispatch(command("pings", {"setting": "9"}, user_id="999"))
+    assert engine._pings.count() == before  # noqa: SLF001
 
 
 def lesson_env(tmp_path: Any) -> dict:

@@ -100,15 +100,23 @@ async def agent_service(ctx: ServiceContext) -> None:
     )
 
     async def recall_loop() -> None:
+        # Slots are N random times/day drawn deterministically per date
+        # (pings.py), so restarts re-draw the same day and can't double-fire.
+        # The wait is capped so a live /pings change lands within minutes
+        # even when the next slot is hours away.
         while not ctx.stop_event.is_set():
+            delay = engine.ping_delay_seconds()
+            delay = 300.0 if delay is None else min(delay, 300.0)
+            with suppress(TimeoutError):
+                await asyncio.wait_for(ctx.stop_event.wait(), timeout=delay)
+            if ctx.stop_event.is_set():
+                break
+            if not engine.ping_due():
+                continue
             try:
                 await engine.recall_tick()
             except Exception:
-                logger.exception("Recall tick failed; will retry next interval.")
-            with suppress(TimeoutError):
-                await asyncio.wait_for(
-                    ctx.stop_event.wait(), timeout=settings.recall_check_interval_seconds
-                )
+                logger.exception("Recall tick failed; will retry next wake.")
 
     async def shutdown_when_asked() -> None:
         await ctx.stop_event.wait()

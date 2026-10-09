@@ -28,10 +28,13 @@ durable, stress-tested capability in whatever discipline I choose.
 
 1. **No engagement-bait, ever.** The agent must never send unprompted messages whose
    purpose is engagement, retention-of-attention, or "keeping the streak alive."
-   Unprompted contact exists for exactly one reason: the retention loop (spaced
-   recall pings, when opted in). A ping is pedagogical or it does not send.
-   (Learner rule, stated 2026-10-09; extends the spine's "autonomous behavior
-   defaults off.")
+   Unprompted contact exists for exactly one reason: pedagogy. Per docs/routing.md
+   that means a ping is ONE of — an owed recall question, a re-verification of an
+   aging `known` node, or a one-line lesson OFFER (teaching itself starts on my
+   reply, never unprompted). A ping is pedagogical or it does not send.
+   (Learner rule, stated 2026-10-09; lesson offers added by learner request same
+   day: "maybe some of those unprompted things are lessons" — offers, not lessons.)
+   Frequency is mine to tune: `/pings <n>` in Discord.
 2. **Never adopt a curriculum; derive one.** Topic *inventory* may come from anywhere
    — syllabi, textbook tables of contents, standards, job postings if employment ever
    becomes the goal. *Sequencing* comes only from: the dependency graph between
