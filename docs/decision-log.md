@@ -534,3 +534,15 @@ Intervention: Folded them into thesis.md's Working hypotheses: H9 (generation be
 Evidence: none yet — all pending; each entry names its basis and watch-fors.
 
 Verdict: keep; first live test is any voice session that opens with owed re-probes interleaved (H10 + H5-refinement) instead of new material.
+
+---
+
+## 2026-10-09 — Duplicate lesson thread from the kickoff brief (root-caused live)
+
+Hypothesis: The double lesson the learner hit on the first discord-transport voice session was a code gap, not model misbehavior — and the timeline would show the kickoff brief as the vector.
+
+Intervention: Reconstructed the event from Discord history (new scripts/fetch_history.py) + the session registry: voice reply carried [lesson: start] (thread A, 17:45:33) → boundary hook auto-closed the dirty session, rotated, backgrounded the kickoff → pi's KICKOFF reply re-emitted [lesson: start | same topic] despite the prompt's "no directive lines" → the executed duplicate superseded thread A (17:46:05) → two kickoffs posted near-identical briefs, one per thread. Fix (code-owned, since prompt compliance is probabilistic): (1) LessonManager.start() of the ALREADY-ACTIVE topic is a no-op, never a supersede; (2) the kickoff path uses _ask_pi_raw + LessonManager.strip() — directives in a boundary's own response are removed WITHOUT execution.
+
+Evidence: live incident 2026-10-09 (threads 1558173591273742396 / 1558173725885599798); 89 tests green incl. 2 regressions pinning idempotent start and strip-don't-execute kickoff.
+
+Verdict: keep. Standing rule sharpened: any reply pi produces AS A RESULT of a boundary must be strip-only; and every directive pi can fire must be safe when fired twice.

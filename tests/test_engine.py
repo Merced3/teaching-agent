@@ -239,6 +239,50 @@ async def test_reply_without_directives_is_untouched(tmp_path) -> None:
     hub.post_message.assert_awaited_once_with(100, "plain reply")
 
 
+async def test_double_start_of_the_active_topic_is_idempotent(tmp_path) -> None:
+    """2026-10-09: a repeated [lesson: start] for the SAME topic superseded
+    the real thread with a duplicate. Starting the active lesson is now a
+    no-op — boundaries pi can reach must be harmless when re-fired."""
+    engine, hub, pi = make_engine(lesson_env(tmp_path))
+    hub.create_thread.return_value = {"id": "777"}
+    pi.prompt.side_effect = [
+        pi_reply("[lesson: start | Races]\nBegin."),
+        pi_reply("close checklist done"),  # the boundary hook's auto-close turn
+        pi_reply("[lesson: start | Races]\nStill going."),
+        pi_reply("brief"),  # the backgrounded kickoff, if it runs
+    ]
+    await engine.dispatch(message("Alvar, go"))
+    await engine.dispatch(message("Alvar, next"))
+    hub.create_thread.assert_awaited_once()  # no second thread
+    posted = [c.args[1] for c in hub.post_message.await_args_list]
+    assert not any("superseded" in t for t in posted)
+    assert posted[-1] == "Still going."
+    assert engine._lessons.thread_id == 777  # noqa: SLF001
+
+
+async def test_kickoff_brief_strips_directives_without_executing(tmp_path) -> None:
+    """The 2026-10-09 duplicate-thread root cause: the kickoff brief is a
+    RESPONSE to a lesson boundary, yet pi re-emitted [lesson: start] in it
+    despite the prompt ban — the executed duplicate superseded the real
+    thread and the brief double-posted. Directives in the brief are now
+    stripped, never executed."""
+    engine, hub, pi = make_engine(lesson_env(tmp_path))
+    hub.create_thread.return_value = {"id": "777"}
+    pi.prompt.side_effect = [
+        pi_reply("[lesson: start | Races]\nLet's begin."),
+        pi_reply("close checklist done"),  # the boundary hook's auto-close turn
+        pi_reply("[lesson: start | Races]\nWHY this lesson, WHAT it covers."),
+    ]
+    await engine.dispatch(message("Alvar, teach me"))
+    await __import__("asyncio").sleep(0.05)  # the kickoff is backgrounded
+    hub.create_thread.assert_awaited_once()  # the stray start created NOTHING
+    posted = [c.args[1] for c in hub.post_message.await_args_list]
+    assert not any("superseded" in t for t in posted)
+    briefs = [t for t in posted if "Lesson brief" in t]
+    assert briefs == ["📘 **Lesson brief — Races**\nWHY this lesson, WHAT it covers."]
+    assert engine._lessons.thread_id == 777  # noqa: SLF001
+
+
 async def test_test_mode_strips_write_tools() -> None:
     """The boundary is the tool surface, not the prompt: in test mode pi
     launches with read-only tools; live mode restores full tools."""

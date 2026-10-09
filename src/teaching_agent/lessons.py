@@ -91,8 +91,27 @@ class LessonManager:
                 logger.exception("Lesson directive failed: %s", line.strip())
         return "\n".join(kept).strip()
 
+    def strip(self, reply: str) -> str:
+        """Remove directive lines WITHOUT executing them — for replies that
+        are a RESPONSE to a boundary (the lesson-kickoff brief), which must
+        never create boundaries themselves. Pi re-emits [lesson: start]
+        despite the kickoff prompt banning directive lines (2026-10-09: the
+        brief's stray start superseded the real thread with a duplicate and
+        the brief double-posted into both); model compliance is
+        probabilistic, so this boundary is code-owned."""
+        return "\n".join(
+            line for line in reply.splitlines() if not _DIRECTIVE.match(line.strip())
+        ).strip()
+
     async def start(self, topic: str) -> str:
         """Open a lesson thread. Returns a human-readable confirmation."""
+        if self._thread_id is not None and self._topic == topic:
+            # Starting the ALREADY-ACTIVE lesson is a no-op, never a
+            # supersede — the other half of the 2026-10-09 duplicate-thread
+            # fix: a repeated start directive must be harmless no matter
+            # where it slips through.
+            logger.info("Lesson start for the active topic %r ignored.", topic)
+            return f"Lesson already active: **{topic}**."
         if self._thread_id is not None:
             await self._post_milestone(
                 f"✅ **Lesson complete: {self._topic}** — superseded by a new lesson."

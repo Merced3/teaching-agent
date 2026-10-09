@@ -482,9 +482,13 @@ class TeachingEngine:
         incident = uuid4().hex[:8]
         reply: str | None = None
         try:
-            reply = await self._ask_pi(
+            # Raw + strip, never _ask_pi: the brief is a RESPONSE to a lesson
+            # boundary and must not create one — pi re-emitted [lesson: start]
+            # here despite the prompt banning it (duplicate thread, 2026-10-09).
+            raw = await self._ask_pi_raw(
                 thread_id, _LESSON_KICKOFF_PROMPT.format(topic=topic)
             )
+            reply = self._lessons.strip(raw) if raw is not None else None
         except Exception:
             logger.exception("Lesson kickoff failed (incident %s).", incident)
         if reply and not reply.startswith("(teacher brain hiccuped"):
