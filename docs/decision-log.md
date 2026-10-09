@@ -610,3 +610,5 @@ Intervention: Decision only, no build. Recorded the shape the mechanism must tak
 Evidence: learner idea 2026-10-09 ("maybe if it wants me to get a certification while also learning something just by watching a short video"). Meta-rule satisfied: need #1 (external books/videos, parked) + need #2 (Pluralsight) = build on next session that wants it.
 
 Verdict: build the intake-report path next session (smallest form: pi records learner-reported intake into current-state UNPROBED via a prompt — likely zero new code, just a handoff/command-prompt line, since pi already writes the knowledge base).
+
+OUTCOME (2026-10-09 night, same session): learner refinement — the intake path must be PROVIDER-AGNOSTIC. Pluralsight is the first source, not the shape: the mechanism records "I consumed X on platform Y" (any course platform, book, video, conference talk), so swapping providers later is a new value for Y, not a redesign. Same pattern as channels-are-adapters (spine): the platform is an adapter, the intake record is the core.
