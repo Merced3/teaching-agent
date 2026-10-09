@@ -1,10 +1,7 @@
 # NEXT-BOOT (consume once, then delete/rename)
 
-- Date written: 2026-10-09 (night — pings redesign session, no teaching, no evidence events).
-- SYSTEM CHANGE (2nd tonight): unprompted pings are now N random times/day (default 3, window 08:00–23:00) via src/teaching_agent/pings.py; content follows docs/routing.md (owed recall → aging-known re-verify → one-line lesson offer — NEVER unprompted teaching). /pings <n>|off|status tunes it live (data/pings.json). The tick prompt changed: read docs/goal.md + docs/routing.md at ping time. NOT yet live-verified. Owed cold pings 2026-10-10..14 will now arrive as random-slot pings.
-- Earlier tonight: docs/goal.md + docs/routing.md created (read at boot); map gained project-anchors table; standing constraint: no engagement pings.
-- Learner state (unchanged): deep-dive complete (5/5); backoff/jitter CLOSED at explained, same-day evidence only, NOT retention.
-- OPEN LESSON: thread "backoff vs jitter" — teaching done, awaiting /lesson end or next strand.
-- Owed cold pings 2026-10-10..14: five-question audit; precondition + reconciliation-job names; provider-lookup-by-request-ID; muddy post-debate outcomes; backoff/jitter split cold re-ping.
-- Next node per routing: rule 1 (owed pings) fires first — deliver the 10-10..14 cold ping window; then rule 3: next edge strand by unblock-count with anchors from the new table.
-- Owed next session: build the intake-report path (decision-log night 3rd entry) — learner reports "I watched X on Pluralsight" → pi records UNPROBED in current-state mapped to a strand → routing folds into pings. Watching = presented; certs never count as known. Also owed: live-verify pings (status/slot fire/off/catch-up).
+- Date written: 2026-10-09 (night, close #3 — lesson opened on request, no teaching, no evidence events).
+- Learner state (unchanged): deep-dive complete (5/5); backoff/jitter CLOSED at explained, same-day only, NOT retention.
+- OPEN LESSON: thread "unknown state after timeout — the tail". UNANSWERED PROBE re-opens next session: reconciliation job asks provider by request ID and gets went-through / never-happened / unknown — what does the system do in each case, and what does the user see? (Old thread "backoff vs jitter" still awaiting /lesson end.)
+- Owed cold pings 2026-10-10..14 (now arriving as random-slot pings, default 3/day 08:00–23:00): five-question audit; precondition + reconciliation-job names; provider-lookup-by-request-ID; the three-outcome probe above; backoff/jitter split cold re-ping.
+- Next node per routing: rule 1 (owed pings) — deliver the 10-10..14 cold ping window, leading with the unanswered three-outcome probe; then rule 3 continues the timeout-tail lesson to a close.
