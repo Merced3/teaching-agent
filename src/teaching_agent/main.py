@@ -126,7 +126,12 @@ async def agent_service(ctx: ServiceContext) -> None:
     ]
     if settings.recall_pings_enabled:
         tasks.append(asyncio.create_task(recall_loop()))
-    await asyncio.gather(*tasks)
+    try:
+        await asyncio.gather(*tasks)
+    finally:
+        # Leave voice + close pi no matter how we exit: the hub outlives us
+        # and keeps whatever we don't release.
+        await engine.stop()
 
 
 def main() -> None:

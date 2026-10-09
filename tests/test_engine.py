@@ -473,3 +473,21 @@ async def test_cancelled_voice_turn_aborts_pi_before_the_next_one() -> None:
     pi.abort.reset_mock()
     assert await engine.ask_pi("turn three") == "answer two"
     pi.abort.assert_not_awaited()
+
+
+async def test_engine_stop_leaves_voice_and_closes_pi() -> None:
+    """The hub owns the voice connection and outlives the agent — exiting
+    without leaving strands a zombie session (live 2026-10-09)."""
+    engine, hub, pi = make_engine()
+    voice = AsyncMock()
+    engine.set_voice(voice)
+    await engine.stop()
+    voice.leave.assert_awaited_once()
+    pi.close.assert_awaited_once()
+
+
+async def test_engine_stop_without_voice_still_closes_pi() -> None:
+    engine, hub, pi = make_engine()
+    assert engine._voice is None  # noqa: SLF001
+    await engine.stop()
+    pi.close.assert_awaited_once()

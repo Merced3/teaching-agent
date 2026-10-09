@@ -331,6 +331,18 @@ class TeachingEngine:
         # Audio render is injectable so tests never shell out to TTS.
         self._render_audio = render_lecture_audio
 
+    async def stop(self) -> None:
+        """Graceful exit. Voice first: the voice connection lives in the
+        HUB's process, so if we die without leaving, the hub keeps a zombie
+        session (2026-10-09: agent restart → hub session orphaned →
+        /voice/join wedged on a 500 until it timed out). Then the pi
+        subprocess. Failures must never block the exit itself."""
+        if self._voice is not None:
+            with suppress(Exception):
+                await self._voice.leave()
+        with suppress(Exception):
+            await self._pi.close()
+
     def set_voice(self, voice: VoiceRuntime) -> None:
         """Attach the voice layer post-construction: the runtime needs the
         engine's pi callback, and the engine needs the runtime — a setter
