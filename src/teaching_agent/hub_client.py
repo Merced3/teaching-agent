@@ -71,6 +71,7 @@ class HubClient:
         display_name: str | None = None,
         avatar_url: str | None = None,
         voice_events: bool = False,
+        allow_thread_deletion: bool = False,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "channel_id": channel_id,
@@ -82,6 +83,8 @@ class HubClient:
             payload["avatar_url"] = avatar_url
         if voice_events:
             payload["voice_events"] = True
+        if allow_thread_deletion:
+            payload["allow_thread_deletion"] = True
         return await self._request("POST", "/registrations", json=payload)
 
     async def put_commands(

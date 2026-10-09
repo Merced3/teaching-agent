@@ -52,6 +52,7 @@ class Settings:
     lecture_edge_rate: str
     voice_enabled: bool
     voice_autojoin: bool
+    allow_thread_deletion: bool
     voice_transport: str
     voice_bridge_url: str
     voice_stt_provider: str
@@ -171,6 +172,9 @@ class Settings:
         voice_autojoin = _parse_bool(
             environment.get("TEACHING_AGENT_VOICE_AUTOJOIN", "true")
         )
+        allow_thread_deletion = _parse_bool(
+            environment.get("TEACHING_AGENT_ALLOW_THREAD_DELETION", "false")
+        )
         voice_transport = environment.get(
             "TEACHING_AGENT_VOICE_TRANSPORT", "discord"
         ).strip()
@@ -272,6 +276,7 @@ class Settings:
             lecture_edge_rate=lecture_edge_rate,
             voice_enabled=voice_enabled,
             voice_autojoin=voice_autojoin,
+            allow_thread_deletion=allow_thread_deletion,
             voice_transport=voice_transport,
             voice_bridge_url=voice_bridge_url,
             voice_stt_provider=voice_stt_provider,

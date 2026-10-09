@@ -425,3 +425,15 @@ async def test_lecture_requires_a_topic(tmp_path) -> None:
     await engine.dispatch(command("lecture", {"topic": "  "}))
     pi.prompt.assert_not_awaited()
     assert hub.post_followup.await_args.kwargs.get("ephemeral") is True
+
+
+async def test_registration_declares_thread_deletion_opt_in() -> None:
+    """The hub scopes DELETE /threads/{id} to registrations that declared it
+    (ADR 0004); the agent passes its configured flag through on claim."""
+    engine, hub, _ = make_engine({"TEACHING_AGENT_ALLOW_THREAD_DELETION": "true"})
+    await engine.start()
+    assert hub.register_channel.await_args.kwargs["allow_thread_deletion"] is True
+
+    engine2, hub2, _ = make_engine()
+    await engine2.start()
+    assert hub2.register_channel.await_args.kwargs["allow_thread_deletion"] is False

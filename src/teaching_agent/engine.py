@@ -343,6 +343,7 @@ class TeachingEngine:
                 display_name=self._settings.agent_name,
                 avatar_url=self._settings.avatar_url,
                 voice_events=self._settings.voice_enabled,
+                allow_thread_deletion=self._settings.allow_thread_deletion,
             )
             logger.info("Registered channel %s.", self._settings.discord_channel_id)
         except HubError as exc:
