@@ -510,3 +510,27 @@ Verdict: keep. Turns are evidence; evidence may degrade (voice → text) but may
 ## 2026-10-08 (addendum) — /voice joins the backgrounded-command pattern
 
 Evidence (hub log, same evening): `/voice` interactions timed out the hub's 2.5s callback budget (`interaction ... callback ... failed; auto-deferring`, TimeoutError) because voice join (WS connect + STT start) was awaited synchronously inside the callback. Auto-defer masked it — no lost work — but it violated the ADR-0003 budget /mode already respects. Fix: `/voice` now defers immediately and works in a background task, same as `/mode`. Regression test updated (followup lands a tick after dispatch). 77 tests green.
+
+---
+
+## 2026-10-09 — Live voice-transport swap + stream-drop reconnects
+
+Hypothesis: (1) The voice carrier is a per-situation choice (bridge at home on good wifi, Discord in the car over bluetooth), so picking it should be a runtime command, not an env change + restart. (2) A dropped voice stream (bridge restart's 1012, hub restart, network blip) should be a reconnect with a one-line log, not a session-ending traceback wall.
+
+Intervention: `/voice action:transport value:discord|bridge` (`VoiceRuntime.set_transport`): leaves any live session, swaps the carrier, and goes live on the new one — the bridge immediately (channel-less), Discord by joining the learner's last-known channel (the engine now tracks `voice_state` channel ids even while on the bridge, so the car scenario — sitting in a channel already — joins instantly). `TEACHING_AGENT_VOICE_TRANSPORT` is now only the startup default. RemotePTT is built unconditionally (inert until heartbeats arrive) and wired only into discord-carrier conversations. `VoiceConversation._read_loop` is now a supervisor: `ConnectionClosed` logs one line (code + reason), shelves the in-flight turn, and walks a 1–16s backoff ladder (re-acquire transport → reopen stream → restart STT); only ladder exhaustion or a deliberate 1000 close ends the session. Sends on a dead socket go quiet instead of raising through the turn task.
+
+Evidence: 86 tests green (9 new: reconnect-resume, ladder give-up, both swap directions, no-channel idle, no-op/invalid swap, engine command + channel tracking). NOT yet live-verified against the real bridge/hub — the gate is a spoken session with a mid-call bridge restart, and a live `/voice action:transport` swap each way.
+
+Verdict: keep (pending live verification next voice session).
+
+---
+
+## 2026-10-09 — Method hypotheses recorded (H9–H11; H5/H7 refined)
+
+Hypothesis: Six candidate teaching methods (generation-before-presentation, interleaving, teach-back-to-skeptic, per-component ping scheduling, retrieval-heavy voice) are worth holding as explicit, testable hypotheses rather than session-chat folklore.
+
+Intervention: Folded them into thesis.md's Working hypotheses: H9 (generation before presentation), H10 (interleaving), H11 (teach-back to a skeptic) as new entries; per-component scheduling merged into H5 and the voice-mode corollary into H7 rather than new numbers (collapse rule — same routing as existing hypotheses).
+
+Evidence: none yet — all pending; each entry names its basis and watch-fors.
+
+Verdict: keep; first live test is any voice session that opens with owed re-probes interleaved (H10 + H5-refinement) instead of new material.
