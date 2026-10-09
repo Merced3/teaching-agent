@@ -143,18 +143,29 @@ class SessionRegistry:
         """
         closing: list[SessionRecord] = []
         live: list[SessionRecord] = []
+        orphaned: list[SessionRecord] = []
         now = datetime.now(UTC)
         for record in self._records.values():
             if record.state == CLOSING:
                 closing.append(record)
             elif record.state == OPEN:
                 if self._is_orphan(record, active_lesson_thread, now, orphan_days):
-                    logger.info("Session %s orphaned (owner=%s); aging out.",
-                                record.id, record.owner)
-                    self.mark_complete(record.id)
+                    # Inline the completion: mark_complete logs and saves per
+                    # record — right for a single close, a log flood and a
+                    # full-registry rewrite per orphan at boot.
+                    record.state = COMPLETE
+                    record.closed_at = _now()
+                    orphaned.append(record)
                 else:
                     live.append(record)
-        if closing or live:
+        if orphaned:
+            logger.info(
+                "Boot: aged out %d orphaned session(s) (%d turns, $%.4f total).",
+                len(orphaned),
+                sum(r.turns for r in orphaned),
+                sum(r.cost_usd for r in orphaned),
+            )
+        if closing or live or orphaned:
             self._save()
         return BootScan(closing=closing, open=live)
 

@@ -4,6 +4,8 @@ mechanics (barge-in, pacing) need a live hub — verified by ear, not here."""
 
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
 from unittest.mock import AsyncMock
 
 import numpy as np
@@ -19,6 +21,11 @@ ENV = {
     "DEEPGRAM_API_KEY": "x",
     "ELEVENLABS_API_KEY": "y",
     "TEACHING_AGENT_VOICE_TTS_VOICE_ID": "z",
+    # Isolated session registry: the default path is the real
+    # data/session-registry.json, and engine tests must never write to it.
+    "TEACHING_AGENT_SESSION_REGISTRY_FILE": str(
+        Path(tempfile.mkdtemp()) / "registry.json"
+    ),
 }
 
 

@@ -106,6 +106,23 @@ def test_boot_scan_ages_out_orphans(tmp_path) -> None:
     assert {r.id for r in scan.open} == {main.id, active.id}
 
 
+def test_boot_scan_logs_one_summary_line_not_two_per_orphan(tmp_path, caplog) -> None:
+    """A backlog of orphans is routine (every run that ended without /close
+    leaves one); boot must not print a two-line wall per record."""
+    import logging
+
+    registry = SessionRegistry(tmp_path / "registry.json")
+    for i in range(25):
+        registry.create(session_file=f"s{i}", owner=lesson_owner(999 + i))
+
+    with caplog.at_level(logging.INFO, logger="teaching_agent.sessions"):
+        registry.boot_scan(orphan_days=7, active_lesson_thread=None)
+
+    aged = [r for r in caplog.messages if "aged out" in r]
+    assert len(aged) == 1
+    assert "25 orphaned session(s)" in aged[0]
+
+
 def test_boot_scan_returns_closing_for_recovery(tmp_path) -> None:
     registry = SessionRegistry(tmp_path / "registry.json")
     record = registry.create(session_file="s1", owner=MAIN_OWNER)

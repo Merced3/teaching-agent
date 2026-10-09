@@ -4,7 +4,9 @@ knowledge base, not in code."""
 
 from __future__ import annotations
 
+import tempfile
 from datetime import date
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -16,6 +18,11 @@ ENV = {
     "DISCORD_CHANNEL_ID": "100",
     "DISCORD_ALLOWED_USER_ID": "42",
     "TEACHING_AGENT_NAME": "Alvar",
+    # Isolated session registry: the default path is the real
+    # data/session-registry.json, and engine tests must never write to it.
+    "TEACHING_AGENT_SESSION_REGISTRY_FILE": str(
+        Path(tempfile.mkdtemp()) / "registry.json"
+    ),
 }
 
 
