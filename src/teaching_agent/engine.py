@@ -311,6 +311,9 @@ class TeachingEngine:
         self._voice = voice
         self._test_mode = settings.test_mode
         self._last_voice_channel_id: int | None = None
+        # A barge-in-cancelled voice turn leaves pi streaming; the next
+        # voice turn must abort it for real before prompting (see ask_pi).
+        self._voice_pi_needs_abort = False
         self._pi.tools = _TEST_MODE_TOOLS if self._test_mode else None
         # Session architecture (decision log 2026-10-06): a persisted
         # registry of pi sessions (OPEN -> CLOSING -> COMPLETE). Sessions
@@ -933,8 +936,25 @@ class TeachingEngine:
             await self._hub.post_message(self._settings.discord_channel_id, reply)
 
     async def ask_pi(self, prompt: str) -> str | None:
-        """Public entry for the voice layer: same pi session as text."""
-        return await self._ask_pi(self._settings.discord_channel_id, prompt)
+        """Public entry for the voice layer: same pi session as text.
+
+        Barge-in cancels the previous voice turn CLIENT-side only — pi
+        keeps streaming the dead run, and the next turn then collides
+        ("Agent is already processing", live 2026-10-09: the collision
+        surfaced as a spoken 'teacher brain hiccuped' non-answer). So a
+        cancelled voice turn marks the session dirty, and the next voice
+        turn sends a real abort (waits for idle) before prompting."""
+        if self._voice_pi_needs_abort:
+            try:
+                await self._pi.abort()
+            except Exception:
+                logger.warning("Pi abort before voice turn failed.", exc_info=True)
+            self._voice_pi_needs_abort = False
+        try:
+            return await self._ask_pi(self._settings.discord_channel_id, prompt)
+        except asyncio.CancelledError:
+            self._voice_pi_needs_abort = True
+            raise
 
     async def _ask_pi(self, channel_id: int, prompt: str) -> str | None:
         raw = await self._ask_pi_raw(channel_id, prompt)

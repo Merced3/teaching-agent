@@ -546,3 +546,15 @@ Intervention: Reconstructed the event from Discord history (new scripts/fetch_hi
 Evidence: live incident 2026-10-09 (threads 1558173591273742396 / 1558173725885599798); 89 tests green incl. 2 regressions pinning idempotent start and strip-don't-execute kickoff.
 
 Verdict: keep. Standing rule sharpened: any reply pi produces AS A RESULT of a boundary must be strip-only; and every directive pi can fire must be safe when fired twice.
+
+---
+
+## 2026-10-09 — Barge-in must abort pi for real, not just cancel the client await
+
+Hypothesis: The "teacher brain hiccuped: Agent is already processing" non-answer the learner heard mid-lesson was the client-side-cancel gap: _interrupt() cancels the asyncio task awaiting pi, but pi keeps streaming the dead run, so the next voice turn's prompt is rejected — and the error text then counted as the turn's "answer", discharging the shelved words.
+
+Intervention: PiRpcClient.abort() (RPC `abort` — kills the run and waits for idle); engine.ask_pi marks the session dirty on CancelledError and sends the abort before the next voice prompt. Collision class fixed at the source instead of retrying.
+
+Evidence: live incident 2026-10-09 (voice turns 5→6, 18:17 UTC); 91 tests green incl. a regression pinning abort-before-next-turn and no-abort-when-clean. Note: turn boundaries on Discord PTT were endpointing+grace (the bot cannot see the key) — the long pause firing early is expected without the remote button; shelved-words already preserves the thought.
+
+Verdict: keep; live-verify with a two-part utterance while a filler is playing.

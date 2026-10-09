@@ -227,6 +227,16 @@ class PiRpcClient:
         _response_data(response)
         self.model = model
 
+    async def abort(self) -> None:
+        """Abort the active run and wait for the session to become idle
+        (RPC `abort`). Needed because cancelling the client-side await of
+        prompt() does NOT stop pi — it keeps streaming the dead run, and
+        the next prompt then fails with 'Agent is already processing'.
+        Deliberately takes no run lock: the whole point is to interrupt a
+        run whose prompt() call was already cancelled (lock released) or
+        is still held elsewhere; _request correlates by id either way."""
+        await self._request({"type": "abort"})
+
     async def new_session(self) -> dict[str, Any]:
         async with self._run_lock:
             await self.start()

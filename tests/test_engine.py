@@ -437,3 +437,39 @@ async def test_registration_declares_thread_deletion_opt_in() -> None:
     engine2, hub2, _ = make_engine()
     await engine2.start()
     assert hub2.register_channel.await_args.kwargs["allow_thread_deletion"] is False
+
+
+async def test_cancelled_voice_turn_aborts_pi_before_the_next_one() -> None:
+    """2026-10-09 (live): barge-in cancelled a voice turn client-side only;
+    pi kept streaming, and the next voice turn bounced off 'Agent is already
+    processing' — the learner got a spoken hiccup as the 'answer'. A cancelled
+    voice turn now marks the session dirty and the next one aborts first."""
+    import asyncio
+
+    import pytest
+
+    engine, hub, pi = make_engine()
+    started = asyncio.Event()
+
+    async def slow_prompt(*args, **kwargs):
+        started.set()
+        await asyncio.Event().wait()  # pends until cancelled
+
+    pi.prompt.side_effect = slow_prompt
+    turn1 = asyncio.create_task(engine.ask_pi("turn one"))
+    await started.wait()
+    turn1.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await turn1
+
+    pi.prompt.side_effect = None
+    pi.prompt.return_value = pi_reply("answer two")
+    result = await engine.ask_pi("turn two")
+
+    pi.abort.assert_awaited_once()  # the stale run was killed for real first
+    assert result == "answer two"
+
+    # A clean turn afterwards does NOT abort (abort is only for dirty sessions).
+    pi.abort.reset_mock()
+    assert await engine.ask_pi("turn three") == "answer two"
+    pi.abort.assert_not_awaited()
