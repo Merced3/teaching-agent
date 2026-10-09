@@ -55,10 +55,11 @@ def build_engine(settings: Settings) -> TeachingEngine:
     if settings.voice_enabled:
         # Remote PTT is an out-of-band turn boundary needed only because
         # Discord hides the learner's PTT key state; the bridge delivers
-        # exact press/release edges inside the voice stream itself.
-        remote_ptt = (
-            RemotePTT() if settings.voice_transport == "discord" else None
-        )
+        # exact press/release edges inside the voice stream itself. Built
+        # unconditionally (it's inert until heartbeats arrive) so a live
+        # transport swap to discord keeps the button working; the voice
+        # runtime only wires it into conversations on the discord carrier.
+        remote_ptt = RemotePTT()
         engine.remote_ptt = remote_ptt
         engine.set_voice(
             VoiceRuntime(

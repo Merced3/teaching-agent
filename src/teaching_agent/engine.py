@@ -106,7 +106,7 @@ _COMMANDS = [
         "options": [
             {
                 "name": "action",
-                "description": "start, stop, status, stt, tts, voice, model",
+                "description": "start, stop, status, transport, stt, tts, voice, model",
                 "type": "string",
                 "required": True,
             },
@@ -779,14 +779,18 @@ class TeachingEngine:
         Auto-join policy: follow the learner into whatever channel they enter;
         end the session when they leave voice entirely. Only meaningful on the
         discord transport — the bridge has no Discord voice channels."""
-        if self._voice is None or not self._voice.requires_channel:
+        if self._voice is None:
             return None
         user = payload.get("user") or {}
         if str(user.get("id")) != str(self._settings.discord_allowed_user_id):
             return None
+        # Track the learner's channel even on the bridge transport, so a
+        # later /voice action:transport discord can join it immediately.
         after = payload.get("after_channel_id")
         if after is not None:
             self._last_voice_channel_id = int(after)
+        if not self._voice.requires_channel:
+            return None  # bridge: no Discord channels to follow
         if not self._settings.voice_autojoin:
             return None
         try:
@@ -836,6 +840,19 @@ class TeachingEngine:
                 await say("Left voice.")
             elif action == "status":
                 await say(self._voice.describe(), ephemeral=True)
+            elif action == "transport":
+                name = await self._voice.set_transport(
+                    value, channel_id=self._last_voice_channel_id
+                )
+                if self._voice.is_active:
+                    await say(
+                        f"Transport switched → {name}. Session is live — talk to me."
+                    )
+                else:
+                    await say(
+                        f"Transport switched → {name}. "
+                        "Join a voice channel and I'll follow."
+                    )
             elif action == "stt":
                 name = await self._voice.set_stt(value)
                 await say(f"Ears swapped → {name}.")
@@ -850,8 +867,9 @@ class TeachingEngine:
                 await say(f"Teacher brain switched to `{value}`.")
             else:
                 await say(
-                    "Actions: start, stop, status, stt <name>, tts <name>, "
-                    "voice <voice-id>, model <provider/model-id>",
+                    "Actions: start, stop, status, transport <discord|bridge>, "
+                    "stt <name>, tts <name>, voice <voice-id>, "
+                    "model <provider/model-id>",
                     ephemeral=True,
                 )
         except (VoiceError, PiRpcError, HubError, ValueError) as exc:

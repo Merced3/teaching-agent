@@ -68,6 +68,8 @@ _FILLER_DELAY_SECONDS = 2.0  # pi silence this long -> first filler
 _FILLER_INTERVAL_SECONDS = 2.0  # then repeat at this interval until pi answers
 _FLUSH_GRACE_SECONDS = 0.8  # after speaking stops, wait this long for the
 # final transcript fragment before firing the merged turn
+_RECONNECT_DELAYS = (1.0, 2.0, 4.0, 8.0, 16.0)  # backoff ladder after a
+# stream drop (bridge/hub restart); the session ends only when it runs out
 
 _VOICE_TURN_TEMPLATE = (
     "[voice session — spoken turn] The learner said (speech-to-text): {text}\n"
@@ -177,10 +179,7 @@ class VoiceConversation:
         if self._remote_ptt is not None:
             self._remote_ptt.on_press = self._remote_press
             self._remote_ptt.on_release = self._remote_release
-        self._ws = await websockets.connect(
-            self._transport.stream_url(self._owner),
-            max_size=8 * 1024 * 1024,
-        )
+        self._ws = await self._open_stream()
         self._wire_stt()
         await self._stt.start()
         self._reader_task = asyncio.create_task(self._read_loop(), name="voice-reader")
@@ -210,42 +209,110 @@ class VoiceConversation:
     def _wire_stt(self) -> None:
         self._stt.on_utterance = self._on_utterance
 
+    async def _open_stream(self) -> websockets.ClientConnection:
+        return await websockets.connect(
+            self._transport.stream_url(self._owner),
+            max_size=8 * 1024 * 1024,
+        )
+
     # -- inbound ------------------------------------------------------------
 
     async def _read_loop(self) -> None:
-        assert self._ws is not None
+        """Supervise the stream. A dropped connection (bridge restart, hub
+        restart, network blip) is a RECONNECT, not the end of the session —
+        the session ends only when the backoff ladder runs out, or when the
+        far end closes deliberately (1000). Disconnects log one line, never
+        a traceback wall."""
         try:
-            async for raw in self._ws:
-                if isinstance(raw, bytes):
-                    continue
-                event = json.loads(raw)
-                if event.get("user_id") != self._transport.speaker_id:
-                    continue
-                if event.get("type") == "audio":
-                    pcm = base64.b64decode(event["pcm"])
-                    self._stt.feed(stereo_48k_to_mono_16k(pcm))
-                elif event.get("type") == "speaking":
-                    logger.info("learner speaking %s", event.get("state"))
-                    if self._manual_mode():
-                        # Button present: audio-VAD events are noise for
-                        # boundary purposes; press/release owns the floor.
-                        continue
-                    if event.get("state") == "started":
-                        self._learner_speaking = True
-                        self._cancel_flush()  # still talking; hold the turn
-                        self._interrupt()
-                    elif event.get("state") == "stopped":
-                        # The speaking key/mic release IS the turn boundary.
-                        # Flush the STT so the last fragment lands, then
-                        # fire the merged turn after a short grace.
-                        self._learner_speaking = False
-                        self._stt.finalize()
-                        self._schedule_flush()
+            while self.is_active:
+                ws = self._ws
+                assert ws is not None
+                try:
+                    await self._read_stream(ws)
+                except websockets.ConnectionClosed as exc:
+                    code, reason = exc.code, exc.reason or ""
+                else:
+                    code, reason = ws.close_code or 1000, ws.close_reason or ""
+                if not self.is_active:
+                    return  # leave() raced us
+                if code == 1000:
+                    logger.info("Voice stream closed by the far end; session ended.")
+                    await self.leave()
+                    return
+                logger.info(
+                    "Voice stream dropped (close %d%s); reconnecting.",
+                    code,
+                    f" {reason}" if reason else "",
+                )
+                # In-flight playback was pointed at the dead socket; shelve
+                # the interrupted turn so nothing the learner said is lost.
+                self._interrupt()
+                if not await self._reconnect():
+                    return
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.exception("Voice stream reader died.")
             await self.leave()
+
+    async def _read_stream(self, ws: websockets.ClientConnection) -> None:
+        async for raw in ws:
+            if isinstance(raw, bytes):
+                continue
+            event = json.loads(raw)
+            if event.get("user_id") != self._transport.speaker_id:
+                continue
+            if event.get("type") == "audio":
+                pcm = base64.b64decode(event["pcm"])
+                self._stt.feed(stereo_48k_to_mono_16k(pcm))
+            elif event.get("type") == "speaking":
+                logger.info("learner speaking %s", event.get("state"))
+                if self._manual_mode():
+                    # Button present: audio-VAD events are noise for
+                    # boundary purposes; press/release owns the floor.
+                    continue
+                if event.get("state") == "started":
+                    self._learner_speaking = True
+                    self._cancel_flush()  # still talking; hold the turn
+                    self._interrupt()
+                elif event.get("state") == "stopped":
+                    # The speaking key/mic release IS the turn boundary.
+                    # Flush the STT so the last fragment lands, then
+                    # fire the merged turn after a short grace.
+                    self._learner_speaking = False
+                    self._stt.finalize()
+                    self._schedule_flush()
+
+    async def _reconnect(self) -> bool:
+        """Rebuild the stream after a drop: re-acquire the transport (the
+        hub/bridge may have restarted, taking the voice connection with
+        it), reattach the duplex stream, restart the STT feed. Bounded by
+        the backoff ladder — False means the session was ended."""
+        for attempt, delay in enumerate(_RECONNECT_DELAYS, 1):
+            await asyncio.sleep(delay)
+            if not self.is_active:
+                return False  # leave() while we were waiting
+            try:
+                with contextlib.suppress(Exception):
+                    await self._stt.stop()
+                if self._transport.requires_channel and self.channel_id is not None:
+                    await self._transport.join(self.channel_id, self._owner)
+                self._ws = await self._open_stream()
+                self._wire_stt()
+                await self._stt.start()
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.info("Voice reconnect attempt %d failed: %s", attempt, exc)
+                continue
+            logger.info("Voice stream reconnected (attempt %d).", attempt)
+            return True
+        logger.warning(
+            "Voice stream unreachable after %d attempts; session ended.",
+            len(_RECONNECT_DELAYS),
+        )
+        await self.leave()
+        return False
 
     def _interrupt(self) -> None:
         """The learner is speaking: stop any reply in flight, right now."""
@@ -478,7 +545,10 @@ class VoiceConversation:
             buffer += chunk
             while len(buffer) >= _FRAME_BYTES:
                 frame, buffer = buffer[:_FRAME_BYTES], buffer[_FRAME_BYTES:]
-                await ws.send(frame)
+                try:
+                    await ws.send(frame)
+                except websockets.ConnectionClosed:
+                    return  # the reader's reconnect owns what happens next
                 frames_sent += 1
                 ahead = frames_sent * _FRAME_SECONDS - (
                     asyncio.get_running_loop().time() - started
@@ -487,4 +557,5 @@ class VoiceConversation:
                     await asyncio.sleep(ahead - _MAX_LEAD_SECONDS)
         # Trailing partial frame: pad with silence so nothing is dropped.
         if buffer and generation == self._generation:
-            await ws.send(buffer.ljust(_FRAME_BYTES, b"\x00"))
+            with contextlib.suppress(websockets.ConnectionClosed):
+                await ws.send(buffer.ljust(_FRAME_BYTES, b"\x00"))

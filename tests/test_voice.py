@@ -136,6 +136,8 @@ class FakeWS:
     def __init__(self, messages: list[dict]) -> None:
         self._messages = messages
         self.sent: list[bytes] = []
+        self.close_code: int | None = None
+        self.close_reason: str | None = None
 
     def __aiter__(self):
         async def gen():
@@ -150,10 +152,40 @@ class FakeWS:
     async def close(self) -> None: ...
 
 
+class HangingWS(FakeWS):
+    """A stream that stays open and silent — stands in for a live session."""
+
+    def __init__(self) -> None:
+        super().__init__([])
+
+    def __aiter__(self):
+        async def gen():
+            await asyncio.Event().wait()  # pends until the reader is cancelled
+            yield
+        return gen()
+
+
+class ClosedWS(FakeWS):
+    """A stream that dies with a 1012, the way a restarting bridge closes."""
+
+    def __init__(self) -> None:
+        super().__init__([])
+
+    def __aiter__(self):
+        async def gen():
+            from websockets.exceptions import ConnectionClosedError
+            from websockets.frames import Close
+
+            raise ConnectionClosedError(Close(1012, "service restart"), None)
+            yield
+        return gen()
+
+
 def make_conversation(ws_messages, *, ask_pi=None, filler_dir=None):
     stt = FakeSTT()
     transport = SimpleNamespace(
         speaker_id="42",
+        requires_channel=True,
         stream_url=lambda owner: "ws://unused/voice/stream",
         join=AsyncMock(),
         leave=AsyncMock(),
@@ -629,3 +661,151 @@ async def test_edge_tts_retries_then_raises_after_exhaustion() -> None:
         assert calls == 3
     finally:
         tts_mod.edge_tts.Communicate = original
+
+
+# -- reconnect: a dropped stream is a reconnect, not the end of the session --
+
+
+async def test_stream_drop_reconnects_and_resumes(monkeypatch) -> None:
+    """A 1012 (bridge service restart) kills the stream; the conversation
+    re-acquires the transport, reopens the stream, restarts STT, and keeps
+    processing events — the session survives."""
+    conversation, stt, _ = make_conversation([])
+    conversation._ws = ClosedWS()  # noqa: SLF001
+    conversation.channel_id = 7  # discord-style session: re-join on reconnect
+    second = FakeWS([{"type": "speaking", "user_id": "42", "state": "stopped"}])
+    connect = AsyncMock(return_value=second)
+    monkeypatch.setattr(conv.websockets, "connect", connect)
+    monkeypatch.setattr(conv, "_RECONNECT_DELAYS", (0.01,))
+
+    await conversation._read_loop()  # noqa: SLF001
+
+    conversation._transport.join.assert_awaited_once_with(7, "test")  # noqa: SLF001
+    connect.assert_awaited_once()
+    assert stt.finalized == 1  # the event on the RESUMED stream was processed
+    # ...then that stream ended cleanly (1000), which ends the session.
+    assert conversation._ws is None  # noqa: SLF001
+
+
+async def test_reconnect_gives_up_after_the_backoff_ladder(monkeypatch) -> None:
+    """When the far end stays down, the ladder runs out and the session
+    ends — one warning line, no traceback wall."""
+    conversation, _, _ = make_conversation([])
+    conversation._ws = ClosedWS()  # noqa: SLF001
+    monkeypatch.setattr(
+        conv.websockets, "connect", AsyncMock(side_effect=OSError("refused"))
+    )
+    monkeypatch.setattr(conv, "_RECONNECT_DELAYS", (0.01, 0.01))
+
+    await conversation._read_loop()  # noqa: SLF001
+
+    assert conversation._ws is None  # session ended  # noqa: SLF001
+    conversation._transport.leave.assert_awaited_once_with("test")  # noqa: SLF001
+
+
+# -- live transport swap (/voice action:transport) ----------------------------
+
+import pytest
+
+from teaching_agent.voice.runtime import VoiceError, VoiceRuntime
+
+
+def make_runtime(monkeypatch, transport: str) -> tuple[VoiceRuntime, AsyncMock]:
+    settings = Settings.from_environment(
+        {**ENV, "TEACHING_AGENT_VOICE_TRANSPORT": transport}, env_file=None
+    )
+    hub = AsyncMock()
+    runtime = VoiceRuntime(settings, hub, ask_pi=AsyncMock())
+    runtime._make_stt = FakeSTT  # noqa: SLF001
+    runtime._make_tts = AsyncMock  # noqa: SLF001
+    monkeypatch.setattr(
+        conv.websockets, "connect", AsyncMock(side_effect=lambda *a, **k: HangingWS())
+    )
+    return runtime, hub
+
+
+async def test_transport_swap_bridge_to_discord_joins_known_channel(monkeypatch) -> None:
+    """The car scenario: on the bridge at home, switch to discord and the
+    agent joins the channel you're already sitting in — no restart."""
+    runtime, hub = make_runtime(monkeypatch, "bridge")
+    assert not runtime.requires_channel
+
+    name = await runtime.set_transport("discord", channel_id=7)
+
+    assert name == "discord" and runtime.requires_channel and runtime.is_active
+    hub.voice_join.assert_awaited_once_with(7, runtime._owner)  # noqa: SLF001
+    await runtime.leave()
+
+
+async def test_transport_swap_discord_to_bridge_goes_live_immediately(monkeypatch) -> None:
+    """The bridge is channel-less: switching to it attaches the stream at
+    once, so the phone page is live the moment it's opened."""
+    runtime, hub = make_runtime(monkeypatch, "discord")
+
+    name = await runtime.set_transport("bridge")
+
+    assert name == "bridge" and not runtime.requires_channel and runtime.is_active
+    hub.voice_join.assert_not_called()  # no channel to acquire on the bridge
+    await runtime.leave()
+
+
+async def test_transport_swap_to_discord_without_channel_stays_idle(monkeypatch) -> None:
+    """No known channel: switch is recorded, auto-join catches the next
+    voice_state event (the learner entering a channel)."""
+    runtime, hub = make_runtime(monkeypatch, "bridge")
+
+    await runtime.set_transport("discord", channel_id=None)
+
+    assert runtime.requires_channel and not runtime.is_active
+    hub.voice_join.assert_not_called()
+
+
+async def test_transport_swap_same_name_is_noop(monkeypatch) -> None:
+    runtime, _ = make_runtime(monkeypatch, "discord")
+    assert await runtime.set_transport("discord") == "discord"
+    assert not runtime.is_active
+
+
+async def test_transport_swap_rejects_unknown_name(monkeypatch) -> None:
+    runtime, _ = make_runtime(monkeypatch, "discord")
+    with pytest.raises(VoiceError):
+        await runtime.set_transport("carrier-pigeon")
+
+
+async def test_engine_voice_transport_command_swaps_carrier() -> None:
+    engine, hub, _, voice = make_engine()
+    voice.is_active = True
+    engine._last_voice_channel_id = 7  # noqa: SLF001
+
+    result = await engine.dispatch(
+        {
+            "type": "command",
+            "command": "voice",
+            "interaction_id": "i1",
+            "user": {"id": "42"},
+            "channel_id": "100",
+            "options": {"action": "transport", "value": "bridge"},
+        }
+    )
+    assert result == {"defer": True, "ephemeral": False}
+    await asyncio.sleep(0.05)
+    voice.set_transport.assert_awaited_once_with("bridge", channel_id=7)
+    assert "Transport switched" in hub.post_followup.call_args.args[1]
+
+
+async def test_engine_tracks_learner_channel_even_on_bridge() -> None:
+    """While on the bridge, voice_state events still update the last-known
+    channel, so a later swap to discord can join it immediately."""
+    engine, _, _, voice = make_engine()
+    voice.requires_channel = False
+
+    await engine.dispatch(
+        {
+            "type": "voice_state",
+            "user": {"id": "42"},
+            "after_channel_id": "777",
+        }
+    )
+
+    assert engine._last_voice_channel_id == 777  # noqa: SLF001
+    voice.join.assert_not_called()  # no auto-join while on the bridge

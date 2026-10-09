@@ -36,31 +36,34 @@ class VoiceRuntime:
         remote_ptt: RemotePTT | None = None,
     ) -> None:
         self._settings = settings
+        self._hub = hub
         self._ask_pi = ask_pi
         self._transcript = transcript
         self._owner = settings.callback_url
-        self._transport = self._make_transport(settings, hub)
+        self._transport_name = settings.voice_transport
+        self._transport = self._make_transport(self._transport_name)
         self._stt_name = settings.voice_stt_provider
         self._tts_name = settings.voice_tts_provider
         self._voice_id = settings.voice_tts_voice_id
         self._remote_ptt = remote_ptt
         self._conversation: VoiceConversation | None = None
 
-    @staticmethod
-    def _make_transport(settings: Settings, hub: Any) -> VoiceTransport:
-        if settings.voice_transport == "bridge":
+    def _make_transport(self, name: str) -> VoiceTransport:
+        settings = self._settings
+        if name == "bridge":
             bridge_ws_url = settings.voice_bridge_url.replace(
                 "http://", "ws://"
             ).replace("https://", "wss://")
             return BridgeTransport(bridge_ws_url)
-        if settings.voice_transport == "discord":
+        if name == "discord":
             hub_ws_url = settings.hub_url.replace("http://", "ws://").replace(
                 "https://", "wss://"
             )
-            return DiscordTransport(hub, hub_ws_url, settings.discord_allowed_user_id)
+            return DiscordTransport(
+                self._hub, hub_ws_url, settings.discord_allowed_user_id
+            )
         raise VoiceError(
-            f"Unknown voice transport {settings.voice_transport!r}. "
-            "Available: discord, bridge"
+            f"Unknown voice transport {name!r}. Available: discord, bridge"
         )
 
     # -- introspection ------------------------------------------------------
@@ -86,7 +89,7 @@ class VoiceRuntime:
         )
         return (
             f"Voice {state}\n"
-            f"Transport: {self._settings.voice_transport}\n"
+            f"Transport: {self._transport_name}\n"
             f"STT (ears): {self._stt_name} — available: {', '.join(STT_PROVIDERS)}\n"
             f"TTS (voice): {self._tts_name} — available: {', '.join(TTS_PROVIDERS)}\n"
             f"TTS voice id: {self._voice_id or '(unset)'}"
@@ -106,7 +109,12 @@ class VoiceRuntime:
                 filler_dir=self._settings.voice_filler_dir,
                 filler_text=self._settings.voice_filler_text or None,
                 filler_interval=self._settings.voice_filler_interval_seconds,
-                remote_ptt=self._remote_ptt,
+                # Remote PTT exists only because Discord hides the learner's
+                # PTT key state; the bridge delivers exact press/release
+                # edges inside the stream itself.
+                remote_ptt=(
+                    self._remote_ptt if self._transport.requires_channel else None
+                ),
             )
         await self._conversation.join(channel_id)
 
@@ -115,6 +123,31 @@ class VoiceRuntime:
             await self._conversation.leave()
 
     # -- live swaps -----------------------------------------------------------
+
+    async def set_transport(self, name: str, channel_id: int | None = None) -> str:
+        """Swap carriers live — the whole point is never restarting the agent
+        for this. An active session moves with the switch (leave on the old
+        carrier, join on the new one). The bridge joins immediately (it is
+        channel-less, so joining is just attaching the stream); Discord
+        joins when a channel is known, otherwise the next voice_state event
+        (the learner entering a channel) triggers the auto-join."""
+        if name not in ("discord", "bridge"):
+            raise VoiceError(
+                f"Unknown voice transport {name!r}. Available: discord, bridge"
+            )
+        if name == self._transport_name:
+            return name
+        await self.leave()
+        self._conversation = None  # built against the old carrier
+        self._transport_name = name
+        self._transport = self._make_transport(name)
+        if self._transport.requires_channel:
+            # Join the channel the learner is already sitting in, when known.
+            if channel_id is not None:
+                await self.join(channel_id)
+        else:
+            await self.join()  # bridge: go live now, the page drives the rest
+        return name
 
     async def set_stt(self, name: str) -> str:
         self._require(name, STT_PROVIDERS, "STT")
