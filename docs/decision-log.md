@@ -572,3 +572,17 @@ Evidence (live, verified by the learner): autojoin followed the learner with NO 
 Verdict: keep all of it. Discord transport is now the field-tested car path; remaining polish is hub-side log levels and the wedge-recovery hardening (hub session).
 
 OUTCOME (2026-10-09 night): bridge-restart reconnect test PASSED live — voice-bridge killed mid-session produced exactly the designed log shape (one line for the 1012 drop, one per failed attempt, "reconnected (attempt 4)" on bridge return, Deepgram re-armed, session alive, no traceback wall). The reconnect ladder is now live-verified, not just test-verified. Open observation from the same session: barge-in during the agent's SPOKEN reply appeared not to stop playback over a bluetooth speaker/mic — undiagnosed (hub speaking events vs acoustic echo suppression of double-talk); check for "learner speaking started" in the agent log next time before treating it as a code bug. The deterministic answer in the car is the remote-PTT button (press = interrupt, no audio needed).
+
+---
+
+## 2026-10-09 (night) — Goal file + routing rule: scope expanded to all of Automations
+
+Hypothesis: Two docs fix the learner's two stated limiters without touching code: (1) `docs/goal.md` makes "what I'm shooting for" a learner-editable INPUT so maps/routing derive from it and discipline changes (physics, math, mechanical/electrical engineering — queued as future goals) cost one file edit; (2) `docs/routing.md` computes the next node (owed pings → fading knowns → edge by unblock-count → unprobed strands) so no session ever ends on "learner picks" — the blank-field moment the learner hit after the 5-node arc completed.
+
+Intervention: Created both docs; added them to the session-handoff read list; closing checklist gained step 5b (state next node per routing); `maps/software-development.md` gained a project-anchors table grounding every strand in the four other Automations projects (discord-hub, automation-harness, voice-bridge, teaching-agent) plus two NEW candidate strands (real-time systems; supervision & recovery). Learner also set standing constraint: NO unprompted engagement-bait messages — unprompted contact exists only for the retention loop. Principle recorded in goal.md: inventory from anywhere (syllabi, TOCs, standards), sequencing only from dependency graph + projects + goal; never adopt a curriculum, derive one.
+
+Evidence: learner request 2026-10-09 ("didn't know where else to go" after completing the socratic-partner nodes; distrust of school curricula; want for easy-to-change goals). Anchors table built from the four projects' READMEs (unverified at code level — probes must read real code per the standing rule).
+
+Verdict: keep pending first routed session. Watch-for: routing is agent-computed from markdown — if picks feel mechanical or ignore learner interest twice, revisit the rule before automating it.
+
+OUTCOME (2026-10-09 night, same session): learner explicitly approved adding goal.md + routing.md to the AGENTS.md read list — done. Spine otherwise untouched (purpose, loop, meta-rule unchanged; the new docs are inputs, not spine).

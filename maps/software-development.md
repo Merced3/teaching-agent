@@ -54,6 +54,28 @@ Status: `known` | `edge` | `unknown` | `blocked`. Evidence levels per AGENTS.md.
 - 2026-09-16 RECALL CHECKS (13-day delay) + NODE 4 taught; see sessions/2026-09-16-recall-checks-node4-state-machines.md. Atomicity recalled unaided at 13 days; guarded-write re-derivable; rowcount/invariant-names/keyed-receipt gone → re-presented; crash window recognizable-only (2nd fade). Node 4: state machine = states + allowed transitions + guarded writes; witness reasoning transferred to pizza domain.
 - 2026-09-01 NODE 2 (transactions/atomicity) taught; see sessions/2026-09-01-node2-transactions.md. Lock-in 1 (rollback shows neither write) correct but guess-flagged, mechanism then explained unaided; credits design: boundary correct, placement before/after unresolved ("I really don't know") → taught charge-before-point-of-no-return + keyed retry; ordering check: archive gap mislabeled unrecoverable (it is retry-safe), Discord-send gap correctly flagged unknown-delivery. Idempotency failed 1-day unaided recall. Repo-verified: real socratic-partner code already uses transaction boundaries + CLOSING/reopen reset + guarded writes (`WHERE status='OPEN'`). Same-day applied re-test: damage modes per boundary correct (applied-level), envelope scope wrong, retry walk double-charged; proof chain not unaided before fatigue → grade stays `explained`; fresh proof re-run owed next session.
 
+## Project anchors (added 2026-10-09 — scope expansion beyond socratic-partner)
+
+The learner's goal (docs/goal.md) is to know EVERY system in the Automations folder,
+not just socratic-partner. H8 anchoring applies per-project. Use these when probing
+or teaching the strand — read the real code first, never teach from assumption.
+
+| strand | anchor project | what to ground probes in |
+| --- | --- | --- |
+| Data & state (all nodes) | socratic-partner, teaching-agent | store.py guarded writes; session-registry OPEN→CLOSING→COMPLETE |
+| Failure & reliability — backoff/timeouts/retries | voice-bridge, teaching-agent voice | reconnect backoff ladders; stream-drop recovery; STT/TTS retry |
+| Scale & performance — queues, backpressure, concurrency | automation-harness, voice-bridge | scheduler + long-running runtime supervision; paced PCM playback, full-duplex audio buffering |
+| Interfaces & boundaries — protocol decoupling | discord-hub, voice-bridge | "transport only" rule; projects never import Discord libs, one hub owns the connection |
+| Interfaces & boundaries — policy vs mechanism | automation-harness | harness owns runtime concerns; app owns workflow |
+| Security — least privilege / blast radius | discord-hub, socratic-partner | single token ownership; explicit allowlisting; hub caretaker permissions opt-in |
+| Correctness & testing — fakes/real semantics | teaching-agent, discord-hub | black-box routing-boundary tests; bridge vs discord transport fakes |
+| Process — rollout/rollback, migrations | socratic-partner, all | SQLite schema migrations; v0.1.0 release discipline; scheduler rollback (lived) |
+| Real-time systems (NEW candidate strand) | voice-bridge, discord-hub | RTP/DAVE breakage as unsanctioned-API risk lesson; PTT as exact turn boundaries vs VAD guesses |
+| Process supervision & recovery (NEW candidate strand) | automation-harness | restart recovery, durable schedules, health reporting |
+
+Rule: when a strand is taught from an anchor, record which project anchored it in
+the evidence column — cross-project transfer is itself evidence (applied → transferred).
+
 ## Notes
 
 - Learner flags uncertainty himself reliably ("I do not truly know") — high-quality probe

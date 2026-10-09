@@ -1,6 +1,6 @@
 # Working in the Learning System
 
-Read `docs/thesis.md`, `docs/learner.md`, `docs/current-state.md`, and `docs/decision-log.md` before planning or changing anything. If the learner hands you `docs/session-handoff.md`, follow it exactly.
+Read `docs/thesis.md`, `docs/learner.md`, `docs/current-state.md`, `docs/decision-log.md`, `docs/goal.md` (what the learner is shooting for — learner-editable input), and `docs/routing.md` (how the next node is computed) before planning or changing anything. If the learner hands you `docs/session-handoff.md`, follow it exactly.
 
 ## The spine
 
