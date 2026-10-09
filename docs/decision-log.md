@@ -598,3 +598,15 @@ Intervention: (1) `src/teaching_agent/pings.py` — PingController draws N rando
 Evidence: learner request 2026-10-09 ("3 random times a day... maybe it can be a /command"); design approved before implementation. 111 tests green. NOT yet live-verified (no real /pings command, no real random-slot day run).
 
 Verdict: keep pending live verification: /pings status shows today's remaining slots; a real slot fires and posts (or stays SILENT); /pings off stops them; a missed-slot catch-up fires once after downtime.
+
+---
+
+## 2026-10-09 (night, 3rd entry) — Intake gap CLOSED as a decision: external intake earns the abstraction
+
+Hypothesis: The parked "intake gap" (current-state, need #1: no way to report intake the agent didn't generate) now has its second real need — learner wants to watch Pluralsight courses (possibly toward certifications) as proof-of-work and have the system stress-test that intake like anything else.
+
+Intervention: Decision only, no build. Recorded the shape the mechanism must take when built: (1) learner reports intake ("I watched X on Pluralsight"); (2) agent records it UNPROBED in current-state with the topic mapped to a map strand — same pattern /lecture episodes already use; (3) routing.md folds it into pings/recall like any UNPROBED intake; (4) watching = `presented`, nothing more — a Pluralsight CERTIFICATE also never counts as `known`; only demonstrated recall does (evidence honesty; Goodhart guard: the cert is inventory + motivation, the loop is the proof).
+
+Evidence: learner idea 2026-10-09 ("maybe if it wants me to get a certification while also learning something just by watching a short video"). Meta-rule satisfied: need #1 (external books/videos, parked) + need #2 (Pluralsight) = build on next session that wants it.
+
+Verdict: build the intake-report path next session (smallest form: pi records learner-reported intake into current-state UNPROBED via a prompt — likely zero new code, just a handoff/command-prompt line, since pi already writes the knowledge base).

@@ -6,4 +6,5 @@
 - Learner state (unchanged): deep-dive complete (5/5); backoff/jitter CLOSED at explained, same-day evidence only, NOT retention.
 - OPEN LESSON: thread "backoff vs jitter" — teaching done, awaiting /lesson end or next strand.
 - Owed cold pings 2026-10-10..14: five-question audit; precondition + reconciliation-job names; provider-lookup-by-request-ID; muddy post-debate outcomes; backoff/jitter split cold re-ping.
-- Next node per routing: rule 1 (owed pings) fires first — deliver the 10-10..14 cold ping window; then rule 3: next edge strand, chosen by unblock-count with anchors from the new table (candidates: unknown-state-after-timeout tail, or an unprobed strand anchored to automation-harness/voice-bridge).
+- Next node per routing: rule 1 (owed pings) fires first — deliver the 10-10..14 cold ping window; then rule 3: next edge strand by unblock-count with anchors from the new table.
+- Owed next session: build the intake-report path (decision-log night 3rd entry) — learner reports "I watched X on Pluralsight" → pi records UNPROBED in current-state mapped to a strand → routing folds into pings. Watching = presented; certs never count as known. Also owed: live-verify pings (status/slot fire/off/catch-up).
