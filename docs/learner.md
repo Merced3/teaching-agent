@@ -76,3 +76,4 @@ Everything here is a **hypothesis about one specific mind**, to be confirmed or 
 - What does "up to speed" feel like to you — being able to *do*, or to *converse about*?
 - Do silent prediction pauses in audio actually trigger retrieval attempts for you, or do you tune them out?
 | Audio re-listening produces recognition fluency, which he initially reads as retention ("it will get better the more I listen") — needs the recall-gate reminder at those moments | observed | 2026-09-03 post-sauna/car report; recalled the node-2 lock-in phrase (prior teaching) but attributed improvement to re-listening |
+| Works well in text lessons too — first text-mode lesson (2026-10-09 timeout tail) after a voice-only stretch; produced a careful written restatement voluntarily ("took me like 15mins to write this") and caught his own error on one prompt. Text gives him time to compose; keep both modalities live | observed | 2026-10-09 |
