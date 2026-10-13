@@ -612,3 +612,15 @@ Evidence: learner idea 2026-10-09 ("maybe if it wants me to get a certification 
 Verdict: build the intake-report path next session (smallest form: pi records learner-reported intake into current-state UNPROBED via a prompt — likely zero new code, just a handoff/command-prompt line, since pi already writes the knowledge base).
 
 OUTCOME (2026-10-09 night, same session): learner refinement — the intake path must be PROVIDER-AGNOSTIC. Pluralsight is the first source, not the shape: the mechanism records "I consumed X on platform Y" (any course platform, book, video, conference talk), so swapping providers later is a new value for Y, not a redesign. Same pattern as channels-are-adapters (spine): the platform is an adapter, the intake record is the core.
+
+---
+
+## 2026-10-13 — Ping conduct: one outstanding question at a time
+
+Hypothesis: The pings spec says "ask ONE of the owed checks now" at every slot, but firing a fresh question while an earlier one sits unanswered stacks threads and trains the learner to ignore pings. Holding to one outstanding question — SILENT on same-day slots while a question is fresh, re-ask or advance next day — gets more answers per owed item.
+
+Intervention: Agent-side conduct rule, no code. During the 2026-10-10..13 stretch: same-day slots after an unanswered question replied SILENT (4 times); one re-ask per day max; new owed item only on a new day or after the previous was answered.
+
+Evidence: learner answered 4 of 5 questions posed this way (10-10 same day; 10-11 question answered 10-12 after one re-ask; 10-13 both halves after a plain re-ask), versus zero answers on any same-day second ping. Consistent with the new learner.md row (one-question-per-day cadence).
+
+Verdict: keep. The tick prompt's "ask ONE now" is now read as "one outstanding at a time"; if a future slot cadence (e.g. /pings 1/day) makes this moot, revisit.
