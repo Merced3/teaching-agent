@@ -460,13 +460,9 @@ class TeachingEngine:
                 if self._lessons.thread_id is not None
                 else MAIN_OWNER
             )
-            self._current = self._sessions.create(
-                session_file=result.session_file, owner=owner
-            )
+            self._current = self._sessions.create(session_file=result.session_file, owner=owner)
         # Every completed turn counts — including the first one.
-        self._sessions.touch(
-            self._current.id, session_file=result.session_file, cost=result.cost
-        )
+        self._sessions.touch(self._current.id, session_file=result.session_file, cost=result.cost)
 
     async def _rotate_session(self, owner: str | None = None) -> None:
         """The /close boundary: the old session is COMPLETE (immutable — a
@@ -483,8 +479,9 @@ class TeachingEngine:
             session_file=session_file if isinstance(session_file, str) else None,
             owner=owner or MAIN_OWNER,
         )
-        logger.info("Rotated to fresh session %s (owner=%s).",
-                    self._current.id, self._current.owner)
+        logger.info(
+            "Rotated to fresh session %s (owner=%s).", self._current.id, self._current.owner
+        )
 
     async def _on_lesson_boundary(self, event: str, thread_id: int | None) -> None:
         """Lesson start/end own session boundaries (decision log 2026-10-06):
@@ -494,12 +491,9 @@ class TeachingEngine:
             if self._current is not None and self._current.turns > 0:
                 # Dirty session: auto-close first, then the fresh session
                 # belongs to the new lesson.
-                logger.info("Auto-closing dirty session %s before lesson start.",
-                            self._current.id)
+                logger.info("Auto-closing dirty session %s before lesson start.", self._current.id)
                 self._sessions.mark_closing(self._current.id)
-                await self._ask_pi_raw(
-                    self._settings.discord_channel_id, _COMMAND_PROMPTS["close"]
-                )
+                await self._ask_pi_raw(self._settings.discord_channel_id, _COMMAND_PROMPTS["close"])
                 await self._rotate_session()
             if self._current is not None:
                 self._sessions.reassign(self._current.id, lesson_owner(thread_id))
@@ -515,9 +509,7 @@ class TeachingEngine:
             # session.
             if self._current is not None:
                 self._sessions.mark_closing(self._current.id)
-                await self._ask_pi_raw(
-                    self._settings.discord_channel_id, _COMMAND_PROMPTS["close"]
-                )
+                await self._ask_pi_raw(self._settings.discord_channel_id, _COMMAND_PROMPTS["close"])
                 await self._rotate_session(owner=MAIN_OWNER)
 
     async def _post_lesson_kickoff(self, thread_id: int) -> None:
@@ -531,17 +523,13 @@ class TeachingEngine:
             # Raw + strip, never _ask_pi: the brief is a RESPONSE to a lesson
             # boundary and must not create one — pi re-emitted [lesson: start]
             # here despite the prompt banning it (duplicate thread, 2026-10-09).
-            raw = await self._ask_pi_raw(
-                thread_id, _LESSON_KICKOFF_PROMPT.format(topic=topic)
-            )
+            raw = await self._ask_pi_raw(thread_id, _LESSON_KICKOFF_PROMPT.format(topic=topic))
             reply = self._lessons.strip(raw) if raw is not None else None
         except Exception:
             logger.exception("Lesson kickoff failed (incident %s).", incident)
         if reply and not reply.startswith("(teacher brain hiccuped"):
             with suppress(HubError):
-                await self._hub.post_message(
-                    thread_id, f"📘 **Lesson brief — {topic}**\n{reply}"
-                )
+                await self._hub.post_message(thread_id, f"📘 **Lesson brief — {topic}**\n{reply}")
             return
         logger.error("Lesson kickoff produced no brief (incident %s).", incident)
         with suppress(HubError):
@@ -573,9 +561,7 @@ class TeachingEngine:
         if (
             self._settings.text_require_address
             and not thread.get("name")  # a thread IS the conversation; no gate
-            and not re.search(
-                rf"\b{re.escape(self._settings.agent_name)}\b", text, re.IGNORECASE
-            )
+            and not re.search(rf"\b{re.escape(self._settings.agent_name)}\b", text, re.IGNORECASE)
         ):
             # The channel doubles as the learner's notepad (and voice
             # transcripts post here); only messages that address the agent
@@ -753,9 +739,7 @@ class TeachingEngine:
 
         asyncio.create_task(run())
 
-    async def _produce_lecture(
-        self, channel_id: int, interaction_id: str, topic: str
-    ) -> None:
+    async def _produce_lecture(self, channel_id: int, interaction_id: str, topic: str) -> None:
         # Ack fast on the interaction token (it expires after 15 min — a
         # long render could outlive it), then deliver results as ordinary
         # channel messages, which never expire. A failed ack is not fatal:
@@ -766,9 +750,7 @@ class TeachingEngine:
                 f"🎙️ Writing an episode on **{topic}** — this takes a few minutes.",
                 ephemeral=False,
             )
-        raw = await self._ask_pi_raw(
-            channel_id, _LECTURE_WRITE_PROMPT.format(topic=topic)
-        )
+        raw = await self._ask_pi_raw(channel_id, _LECTURE_WRITE_PROMPT.format(topic=topic))
         if raw is None:
             await self._hub.post_message(channel_id, "(teacher brain hiccuped)")
             return
@@ -787,9 +769,7 @@ class TeachingEngine:
         try:
             source = resolve_lesson_file(self._settings.knowledge_root, declared)
         except LectureError as exc:
-            await self._hub.post_message(
-                channel_id, f"⚠️ Lecture file problem: {exc}"
-            )
+            await self._hub.post_message(channel_id, f"⚠️ Lecture file problem: {exc}")
             return
         audio_path = source.with_name("lecture.mp3")
         try:
@@ -802,15 +782,13 @@ class TeachingEngine:
                 edge_rate=self._settings.lecture_edge_rate,
             )
         except (LectureError, OSError) as exc:
-            await self._hub.post_message(
-                channel_id, f"⚠️ Audio render failed: {exc}"
-            )
+            await self._hub.post_message(channel_id, f"⚠️ Audio render failed: {exc}")
             return
         relative = audio_path.resolve().relative_to(
             (self._settings.knowledge_root / "lessons").resolve()
         )
         link = f"{self._settings.lecture_public_url}/lectures/{relative.as_posix()}"
-        words = len(source.read_text(encoding='utf-8').split())
+        words = len(source.read_text(encoding="utf-8").split())
         # Retention hook BEFORE the link post: the record is the point of
         # the feature and must survive a Discord hiccup. This write is
         # pi's (knowledge base), not the code's.
@@ -822,9 +800,7 @@ class TeachingEngine:
             today=date.today().isoformat(),
         )
         await self._ask_pi_raw(channel_id, record)
-        text = (
-            (display + "\n\n") if display else ""
-        ) + f"🎧 **Episode ready:** {link}"
+        text = ((display + "\n\n") if display else "") + f"🎧 **Episode ready:** {link}"
         await self._hub.post_message(channel_id, text)
 
     async def _handle_voice_state(self, payload: dict[str, Any]) -> None:
@@ -876,7 +852,9 @@ class TeachingEngine:
                 if not self._voice.requires_channel:
                     # Bridge transport: the phone page is the room; no channel.
                     await self._voice.join()
-                    await say("Voice session started on the bridge. Open the page and hold the button.")
+                    await say(
+                        "Voice session started on the bridge. Open the page and hold the button."
+                    )
                     return
                 channel_id = int(value) if value else self._last_voice_channel_id
                 if channel_id is None:
@@ -898,14 +876,9 @@ class TeachingEngine:
                     value, channel_id=self._last_voice_channel_id
                 )
                 if self._voice.is_active:
-                    await say(
-                        f"Transport switched → {name}. Session is live — talk to me."
-                    )
+                    await say(f"Transport switched → {name}. Session is live — talk to me.")
                 else:
-                    await say(
-                        f"Transport switched → {name}. "
-                        "Join a voice channel and I'll follow."
-                    )
+                    await say(f"Transport switched → {name}. Join a voice channel and I'll follow.")
             elif action == "stt":
                 name = await self._voice.set_stt(value)
                 await say(f"Ears swapped → {name}.")
@@ -999,9 +972,7 @@ class TeachingEngine:
         interaction_id = str(payload.get("interaction_id"))
         setting = str((payload.get("options") or {}).get("setting") or "").strip().lower()
         if setting == "status":
-            await self._hub.post_followup(
-                interaction_id, self._pings.describe(), ephemeral=False
-            )
+            await self._hub.post_followup(interaction_id, self._pings.describe(), ephemeral=False)
             return
         if setting in {"off", "0"}:
             self._pings.set_count(0)
@@ -1073,19 +1044,18 @@ class TeachingEngine:
             if self._boot_context is not None:
                 prompt_text = (
                     "[boot context — sessions/NEXT-BOOT.md, read this FIRST "
-                    "before anything else]:\n" + self._boot_context
-                    + "\n\n" + prompt
+                    "before anything else]:\n" + self._boot_context + "\n\n" + prompt
                 )
                 self._boot_context = None
-            result = await self._pi.prompt(
-                f"[date: {date.today().isoformat()}] {prompt_text}"
-            )
+            result = await self._pi.prompt(f"[date: {date.today().isoformat()}] {prompt_text}")
         except PiRpcError as exc:
             logger.exception("Pi run failed.")
             return f"(teacher brain hiccuped: {exc})"
         logger.info(
             "Pi run: model=%s/%s cost=$%.4f",
-            result.provider, result.model_id, result.cost,
+            result.provider,
+            result.model_id,
+            result.cost,
         )
         self._sync_session(result)
         await self._maybe_warn_cost(channel_id)

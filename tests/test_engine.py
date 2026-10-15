@@ -20,9 +20,7 @@ ENV = {
     "TEACHING_AGENT_NAME": "Alvar",
     # Isolated session registry: the default path is the real
     # data/session-registry.json, and engine tests must never write to it.
-    "TEACHING_AGENT_SESSION_REGISTRY_FILE": str(
-        Path(tempfile.mkdtemp()) / "registry.json"
-    ),
+    "TEACHING_AGENT_SESSION_REGISTRY_FILE": str(Path(tempfile.mkdtemp()) / "registry.json"),
     # Isolated ping state: /pings tests must never write the real data/pings.json.
     "TEACHING_AGENT_PINGS_STATE_FILE": str(Path(tempfile.mkdtemp()) / "pings.json"),
 }
@@ -33,9 +31,14 @@ def make_engine(extra_env: dict | None = None) -> tuple[TeachingEngine, AsyncMoc
     hub = AsyncMock()
     pi = AsyncMock()
     pi.prompt.return_value = PiRunResult(
-        text="reply", session_id="s", session_file=None,
-        provider="openrouter", model_id="m",
-        input_tokens=1, output_tokens=1, cost=0.0,
+        text="reply",
+        session_id="s",
+        session_file=None,
+        provider="openrouter",
+        model_id="m",
+        input_tokens=1,
+        output_tokens=1,
+        cost=0.0,
     )
     return TeachingEngine(settings, hub, pi), hub, pi
 
@@ -91,8 +94,14 @@ async def test_thread_messages_reply_into_the_thread() -> None:
 async def test_recall_tick_silent_means_no_message() -> None:
     engine, hub, pi = await _started()
     pi.prompt.return_value = PiRunResult(
-        text="SILENT", session_id="s", session_file=None,
-        provider=None, model_id=None, input_tokens=0, output_tokens=0, cost=0.0,
+        text="SILENT",
+        session_id="s",
+        session_file=None,
+        provider=None,
+        model_id=None,
+        input_tokens=0,
+        output_tokens=0,
+        cost=0.0,
     )
     settings = Settings.from_environment(
         {**ENV, "TEACHING_AGENT_RECALL_PINGS_ENABLED": "true"}, env_file=None
@@ -187,9 +196,14 @@ def lesson_env(tmp_path: Any) -> dict:
 
 def pi_reply(text: str) -> Any:
     return PiRunResult(
-        text=text, session_id="s", session_file=None,
-        provider="openrouter", model_id="m",
-        input_tokens=1, output_tokens=1, cost=0.0,
+        text=text,
+        session_id="s",
+        session_file=None,
+        provider="openrouter",
+        model_id="m",
+        input_tokens=1,
+        output_tokens=1,
+        cost=0.0,
     )
 
 
@@ -239,9 +253,7 @@ async def test_pi_end_directive_is_ignored_close_is_human_only(tmp_path) -> None
     assert state_file.exists()
     # ...and the reply (stripped) still goes to the THREAD, not main.
     hub.post_message.assert_any_await(777, "Well done.")
-    assert not any(
-        "Lesson complete" in str(c.args[1]) for c in hub.post_message.await_args_list
-    )
+    assert not any("Lesson complete" in str(c.args[1]) for c in hub.post_message.await_args_list)
     # The human command still closes it.
     await engine.dispatch(command("lesson", {"action": "end", "value": "done"}))
     assert engine._lessons.thread_id is None  # noqa: SLF001

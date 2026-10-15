@@ -64,6 +64,7 @@ class TranscriptSink:
     unanswered: OnUnanswered
     notice: OnNotice | None = None
 
+
 _FILLER_DELAY_SECONDS = 2.0  # pi silence this long -> first filler
 _FILLER_INTERVAL_SECONDS = 2.0  # then repeat at this interval until pi answers
 _FLUSH_GRACE_SECONDS = 0.8  # after speaking stops, wait this long for the
@@ -328,9 +329,7 @@ class VoiceConversation:
         speaking-stopped signal, not to a silence timer."""
         if not self.is_active:
             return
-        logger.info(
-            "STT fragment (learner_speaking=%s): %s", self._learner_speaking, text
-        )
+        logger.info("STT fragment (learner_speaking=%s): %s", self._learner_speaking, text)
         self._pending_utterances.append(text)
         if not self._learner_speaking:
             self._schedule_flush()
@@ -343,9 +342,7 @@ class VoiceConversation:
     def _schedule_flush(self) -> None:
         self._cancel_flush()
         if self.is_active:
-            self._flush_task = asyncio.create_task(
-                self._flush_after_grace(), name="voice-flush"
-            )
+            self._flush_task = asyncio.create_task(self._flush_after_grace(), name="voice-flush")
 
     async def _flush_after_grace(self) -> None:
         try:
@@ -363,9 +360,7 @@ class VoiceConversation:
         if self._turn_task is not None and not self._turn_task.done():
             self._turn_task.cancel()
         generation = self._generation
-        self._turn_task = asyncio.create_task(
-            self._run_turn(generation, text), name="voice-turn"
-        )
+        self._turn_task = asyncio.create_task(self._run_turn(generation, text), name="voice-turn")
 
     # -- one turn -----------------------------------------------------------
 
@@ -380,9 +375,7 @@ class VoiceConversation:
                     with contextlib.suppress(OSError):
                         clips.append(path.read_bytes())
             self._filler_clips = clips
-            logger.info(
-                "Filler clips loaded: %d (dir: %s).", len(clips), self._filler_dir
-            )
+            logger.info("Filler clips loaded: %d (dir: %s).", len(clips), self._filler_dir)
         return self._filler_clips
 
     async def _run_turn(self, generation: int, learner_text: str) -> None:
@@ -433,7 +426,9 @@ class VoiceConversation:
                 # The incident id ties this Discord note to the log entry.
                 incident = uuid4().hex[:8]
                 logger.error(
-                    "Voice turn %d TTS failed (incident %s).", generation, incident,
+                    "Voice turn %d TTS failed (incident %s).",
+                    generation,
+                    incident,
                     exc_info=True,
                 )
                 if sink is not None and sink.notice is not None:
@@ -476,12 +471,8 @@ class VoiceConversation:
         """Ask pi; while it thinks in silence, say what is happening
         ("Loading an answer.") at a fixed interval — a status signal, not
         a personality. No variants by design."""
-        ask = asyncio.ensure_future(
-            self._ask_pi(_VOICE_TURN_TEMPLATE.format(text=learner_text))
-        )
-        first_delay = (
-            self._filler_interval if self._filler_text else _FILLER_DELAY_SECONDS
-        )
+        ask = asyncio.ensure_future(self._ask_pi(_VOICE_TURN_TEMPLATE.format(text=learner_text)))
+        first_delay = self._filler_interval if self._filler_text else _FILLER_DELAY_SECONDS
         delay = first_delay
         index = 0
         try:
@@ -497,11 +488,7 @@ class VoiceConversation:
                     index += 1
                     logger.info("pi still thinking — playing filler %d.", index)
                     await self._play_filler(generation, clip)
-                    delay = (
-                        self._filler_interval
-                        if self._filler_text
-                        else _FILLER_INTERVAL_SECONDS
-                    )
+                    delay = self._filler_interval if self._filler_text else _FILLER_INTERVAL_SECONDS
             return await ask
         except asyncio.CancelledError:
             ask.cancel()
@@ -550,9 +537,7 @@ class VoiceConversation:
                 except websockets.ConnectionClosed:
                     return  # the reader's reconnect owns what happens next
                 frames_sent += 1
-                ahead = frames_sent * _FRAME_SECONDS - (
-                    asyncio.get_running_loop().time() - started
-                )
+                ahead = frames_sent * _FRAME_SECONDS - (asyncio.get_running_loop().time() - started)
                 if ahead > _MAX_LEAD_SECONDS:
                     await asyncio.sleep(ahead - _MAX_LEAD_SECONDS)
         # Trailing partial frame: pad with silence so nothing is dropped.

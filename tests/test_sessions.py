@@ -40,9 +40,14 @@ def make_engine(
     hub = AsyncMock()
     pi = AsyncMock()
     pi.prompt.return_value = PiRunResult(
-        text="reply", session_id="s", session_file="data/pi-sessions/s1.json",
-        provider="openrouter", model_id="m",
-        input_tokens=1, output_tokens=1, cost=0.10,
+        text="reply",
+        session_id="s",
+        session_file="data/pi-sessions/s1.json",
+        provider="openrouter",
+        model_id="m",
+        input_tokens=1,
+        output_tokens=1,
+        cost=0.10,
     )
     pi.new_session.return_value = {"sessionFile": "data/pi-sessions/s2.json"}
     return TeachingEngine(settings, hub, pi), hub, pi
@@ -246,9 +251,7 @@ async def test_next_boot_is_consumed_exactly_once(tmp_path) -> None:
     (knowledge / "sessions").mkdir(parents=True)
     boot = knowledge / "sessions" / "NEXT-BOOT.md"
     boot.write_text("owed: crash-window check, due today", encoding="utf-8")
-    engine, hub, pi = make_engine(
-        tmp_path, {"TEACHING_AGENT_KNOWLEDGE_ROOT": str(knowledge)}
-    )
+    engine, hub, pi = make_engine(tmp_path, {"TEACHING_AGENT_KNOWLEDGE_ROOT": str(knowledge)})
     await engine.start()
     assert not boot.exists()  # renamed so it can't be consumed twice
     assert list((knowledge / "sessions").glob("NEXT-BOOT.consumed-*.md"))
@@ -269,12 +272,8 @@ async def test_next_boot_is_never_spent_on_a_dying_session(tmp_path) -> None:
     registry.mark_closing(record.id)
     knowledge = tmp_path / "kb"
     (knowledge / "sessions").mkdir(parents=True)
-    (knowledge / "sessions" / "NEXT-BOOT.md").write_text(
-        "owed: invariant names", encoding="utf-8"
-    )
-    engine, hub, pi = make_engine(
-        tmp_path, {"TEACHING_AGENT_KNOWLEDGE_ROOT": str(knowledge)}
-    )
+    (knowledge / "sessions" / "NEXT-BOOT.md").write_text("owed: invariant names", encoding="utf-8")
+    engine, hub, pi = make_engine(tmp_path, {"TEACHING_AGENT_KNOWLEDGE_ROOT": str(knowledge)})
     await engine.start()
     recovery_prompt = pi.prompt.await_args.args[0]
     assert "interrupted mid-close" in recovery_prompt
@@ -300,22 +299,19 @@ async def test_lesson_end_checkpoints_before_freezing(tmp_path) -> None:
     assert len(close_prompts) == 1
     pi.new_session.assert_awaited_once()  # rotated AFTER the checklist
     lesson_session = next(
-        r for r in engine._sessions.all() if r.owner == lesson_owner(555)  # noqa: SLF001
+        r
+        for r in engine._sessions.all()
+        if r.owner == lesson_owner(555)  # noqa: SLF001
     )
     assert lesson_session.state == COMPLETE
 
 
 async def test_cost_threshold_warns_but_never_forces_rotation(tmp_path) -> None:
-    engine, hub, pi = make_engine(
-        tmp_path, {"TEACHING_AGENT_SESSION_COST_WARN_USD": "0.15"}
-    )
+    engine, hub, pi = make_engine(tmp_path, {"TEACHING_AGENT_SESSION_COST_WARN_USD": "0.15"})
     await engine.start()
-    await engine.dispatch(message("Alvar, one"))   # cumulative $0.10
-    await engine.dispatch(message("Alvar, two"))   # cumulative $0.20 -> warn
-    warnings = [
-        c for c in hub.post_message.await_args_list
-        if "💸" in str(c)
-    ]
+    await engine.dispatch(message("Alvar, one"))  # cumulative $0.10
+    await engine.dispatch(message("Alvar, two"))  # cumulative $0.20 -> warn
+    warnings = [c for c in hub.post_message.await_args_list if "💸" in str(c)]
     assert len(warnings) == 1
     pi.new_session.assert_not_awaited()  # warned, never force-reset
     await engine.dispatch(message("Alvar, three"))  # one warning per session

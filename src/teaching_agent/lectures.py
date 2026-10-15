@@ -100,14 +100,10 @@ async def render_lecture_audio(
         stderr=asyncio.subprocess.STDOUT,
     )
     try:
-        stdout, _ = await asyncio.wait_for(
-            process.communicate(), timeout=RENDER_TIMEOUT_SECONDS
-        )
+        stdout, _ = await asyncio.wait_for(process.communicate(), timeout=RENDER_TIMEOUT_SECONDS)
     except TimeoutError:
         process.kill()
-        raise LectureError(
-            f"audio render timed out after {RENDER_TIMEOUT_SECONDS}s"
-        ) from None
+        raise LectureError(f"audio render timed out after {RENDER_TIMEOUT_SECONDS}s") from None
     if process.returncode != 0:
         tail = (stdout or b"").decode(errors="replace")[-400:]
         raise LectureError(f"audio render failed ({process.returncode}): {tail}")

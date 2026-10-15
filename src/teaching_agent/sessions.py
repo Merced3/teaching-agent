@@ -80,10 +80,7 @@ class SessionRegistry:
 
     def find_by_owner(self, owner: str) -> SessionRecord | None:
         """The newest OPEN session owned by `owner`, if any."""
-        owned = [
-            r for r in self._records.values()
-            if r.state == OPEN and r.owner == owner
-        ]
+        owned = [r for r in self._records.values() if r.state == OPEN and r.owner == owner]
         return max(owned, key=lambda r: r.created_at) if owned else None
 
     def create(self, *, session_file: str | None, owner: str | None) -> SessionRecord:
@@ -99,9 +96,7 @@ class SessionRegistry:
         logger.info("Session %s registered (%s, owner=%s).", record.id, OPEN, owner)
         return record
 
-    def touch(
-        self, record_id: str, *, session_file: str | None, cost: float
-    ) -> None:
+    def touch(self, record_id: str, *, session_file: str | None, cost: float) -> None:
         """Record a completed turn: session file (late-binding), count, spend."""
         record = self._records[record_id]
         if session_file:
@@ -125,12 +120,11 @@ class SessionRegistry:
         record.state = COMPLETE
         record.closed_at = _now()
         self._save()
-        logger.info("Session %s COMPLETE (%s turns, $%.4f).",
-                    record.id, record.turns, record.cost_usd)
+        logger.info(
+            "Session %s COMPLETE (%s turns, $%.4f).", record.id, record.turns, record.cost_usd
+        )
 
-    def boot_scan(
-        self, *, orphan_days: int, active_lesson_thread: int | None
-    ) -> BootScan:
+    def boot_scan(self, *, orphan_days: int, active_lesson_thread: int | None) -> BootScan:
         """Classify persisted sessions at process start.
 
         - CLOSING records are returned for the engine to finish the close

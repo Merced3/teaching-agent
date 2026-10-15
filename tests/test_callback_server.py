@@ -10,9 +10,7 @@ from teaching_agent.callback_server import create_callback_app
 
 async def _get(app, path: str) -> httpx.Response:
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://test"
-    ) as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         return await client.get(path)
 
 

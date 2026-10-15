@@ -116,7 +116,9 @@ class PiRpcClient:
 
         logger.info(
             "Starting Pi RPC process (session name: %s, tools=%s, extra=%s).",
-            self.session_name, self.tools, self.extra_arguments,
+            self.session_name,
+            self.tools,
+            self.extra_arguments,
         )
         try:
             self._process = await asyncio.create_subprocess_exec(
@@ -192,14 +194,10 @@ class PiRpcClient:
                     process.kill()
                     await process.wait()
 
-        tasks = tuple(
-            task for task in (self._stdout_task, self._stderr_task) if task is not None
-        )
+        tasks = tuple(task for task in (self._stdout_task, self._stderr_task) if task is not None)
         if tasks:
             try:
-                await asyncio.wait_for(
-                    asyncio.gather(*tasks, return_exceptions=True), timeout=5
-                )
+                await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=5)
             except TimeoutError:
                 for task in tasks:
                     if not task.done():
@@ -411,16 +409,11 @@ def _empty_text_detail(assistant: dict[str, Any]) -> str:
     stop_reason = assistant.get("stopReason")
     content = assistant.get("content")
     if isinstance(content, list):
-        block_types = [
-            str(item.get("type")) for item in content if isinstance(item, dict)
-        ]
+        block_types = [str(item.get("type")) for item in content if isinstance(item, dict)]
         shape = ",".join(block_types) or "empty-list"
     else:
         shape = type(content).__name__
-    return (
-        "Pi settled without a text response "
-        f"(stopReason={stop_reason!r}, content=[{shape}])."
-    )
+    return f"Pi settled without a text response (stopReason={stop_reason!r}, content=[{shape}])."
 
 
 def _raise_for_assistant_error(assistant: dict[str, Any]) -> None:

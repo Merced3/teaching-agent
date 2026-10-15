@@ -7,7 +7,7 @@ GET /channels/{id}/history (threads are read as their own channel ids).
 Usage (always with the venv interpreter):
 
     ./.venv/Scripts/python scripts/fetch_history.py 1234567890 --after "2026-10-09 12:00"
-    ./.venv/Scripts/python scripts/fetch_history.py 111 222 333 --after "2026-10-09 12:00" --json out.json
+    ./.venv/Scripts/python scripts/fetch_history.py 111 222 333 --json out.json
 """
 
 from __future__ import annotations

@@ -103,9 +103,7 @@ class Settings:
         ).resolve()
         pi_executable = environment.get("TEACHING_AGENT_PI_EXECUTABLE", "pi").strip()
         pi_session_directory = Path(
-            environment.get(
-                "TEACHING_AGENT_PI_SESSION_DIRECTORY", "data/pi-sessions"
-            ).strip()
+            environment.get("TEACHING_AGENT_PI_SESSION_DIRECTORY", "data/pi-sessions").strip()
         )
         pi_model = environment.get("TEACHING_AGENT_PI_MODEL", "").strip() or None
         pi_timeout_seconds = _positive_int_with_default(
@@ -118,17 +116,13 @@ class Settings:
             environment.get("TEACHING_AGENT_TEXT_REQUIRE_ADDRESS", "true")
         )
         lesson_state_file = Path(
-            environment.get(
-                "TEACHING_AGENT_LESSON_STATE_FILE", "data/lesson-state.json"
-            ).strip()
+            environment.get("TEACHING_AGENT_LESSON_STATE_FILE", "data/lesson-state.json").strip()
             or "data/lesson-state.json"
         )
         # Lesson kickoff: on lesson start (directive OR /lesson start),
         # backfill the lesson-owned session with a pi-written WHY/WHAT
         # brief, posted as the thread's first message.
-        lesson_kickoff = _parse_bool(
-            environment.get("TEACHING_AGENT_LESSON_KICKOFF", "true")
-        )
+        lesson_kickoff = _parse_bool(environment.get("TEACHING_AGENT_LESSON_KICKOFF", "true"))
         # Session registry (decision log 2026-10-06): persisted OPEN ->
         # CLOSING -> COMPLETE lifecycle so crash/restart reattaches owners.
         session_registry_file = Path(
@@ -175,34 +169,22 @@ class Settings:
         # Where generated lecture audio is linked from. The file is served by
         # this agent's own callback server; the default only works on this
         # machine — set the LAN/Tailscale URL for phone listening.
-        lecture_public_url = environment.get(
-            "TEACHING_AGENT_LECTURE_PUBLIC_URL", ""
-        ).strip()
+        lecture_public_url = environment.get("TEACHING_AGENT_LECTURE_PUBLIC_URL", "").strip()
         if not lecture_public_url:
             lecture_public_url = f"http://{callback_host}:{callback_port}"
-        lecture_tts = environment.get(
-            "TEACHING_AGENT_LECTURE_TTS", "elevenlabs"
-        ).strip()
+        lecture_tts = environment.get("TEACHING_AGENT_LECTURE_TTS", "elevenlabs").strip()
         if lecture_tts not in ("elevenlabs", "edge"):
-            raise ConfigurationError(
-                "TEACHING_AGENT_LECTURE_TTS must be 'elevenlabs' or 'edge'."
-            )
+            raise ConfigurationError("TEACHING_AGENT_LECTURE_TTS must be 'elevenlabs' or 'edge'.")
         lecture_edge_voice = environment.get(
             "TEACHING_AGENT_LECTURE_EDGE_VOICE", "en-US-AndrewNeural"
         ).strip()
-        lecture_edge_rate = environment.get(
-            "TEACHING_AGENT_LECTURE_EDGE_RATE", "-4%"
-        ).strip()
+        lecture_edge_rate = environment.get("TEACHING_AGENT_LECTURE_EDGE_RATE", "-4%").strip()
         voice_enabled = _parse_bool(environment.get("TEACHING_AGENT_VOICE_ENABLED", "false"))
-        voice_autojoin = _parse_bool(
-            environment.get("TEACHING_AGENT_VOICE_AUTOJOIN", "true")
-        )
+        voice_autojoin = _parse_bool(environment.get("TEACHING_AGENT_VOICE_AUTOJOIN", "true"))
         allow_thread_deletion = _parse_bool(
             environment.get("TEACHING_AGENT_ALLOW_THREAD_DELETION", "false")
         )
-        voice_transport = environment.get(
-            "TEACHING_AGENT_VOICE_TRANSPORT", "discord"
-        ).strip()
+        voice_transport = environment.get("TEACHING_AGENT_VOICE_TRANSPORT", "discord").strip()
         if voice_transport not in ("discord", "bridge"):
             raise ConfigurationError(
                 "TEACHING_AGENT_VOICE_TRANSPORT must be 'discord' or 'bridge'."
@@ -216,9 +198,7 @@ class Settings:
         voice_tts_model_id = environment.get(
             "TEACHING_AGENT_VOICE_TTS_MODEL", "eleven_turbo_v2_5"
         ).strip()
-        voice_edge_rate = environment.get(
-            "TEACHING_AGENT_VOICE_EDGE_RATE", "+0%"
-        ).strip()
+        voice_edge_rate = environment.get("TEACHING_AGENT_VOICE_EDGE_RATE", "+0%").strip()
         voice_post_transcript = _parse_bool(
             environment.get("TEACHING_AGENT_VOICE_POST_TRANSCRIPT", "true")
         )
@@ -336,9 +316,7 @@ def _required_positive_int(environment: Mapping[str, str], name: str) -> int:
     return value
 
 
-def _positive_int_with_default(
-    environment: Mapping[str, str], name: str, *, default: int
-) -> int:
+def _positive_int_with_default(environment: Mapping[str, str], name: str, *, default: int) -> int:
     raw_value = environment.get(name)
     if raw_value is None or not raw_value.strip():
         return default

@@ -23,9 +23,7 @@ ENV = {
     "TEACHING_AGENT_VOICE_TTS_VOICE_ID": "z",
     # Isolated session registry: the default path is the real
     # data/session-registry.json, and engine tests must never write to it.
-    "TEACHING_AGENT_SESSION_REGISTRY_FILE": str(
-        Path(tempfile.mkdtemp()) / "registry.json"
-    ),
+    "TEACHING_AGENT_SESSION_REGISTRY_FILE": str(Path(tempfile.mkdtemp()) / "registry.json"),
 }
 
 
@@ -61,26 +59,20 @@ def test_tts_chunk_upsamples_to_hub_format() -> None:
 
 async def test_follows_the_learner_into_voice() -> None:
     engine, hub, _, voice = make_engine()
-    await engine.dispatch(
-        {"type": "voice_state", "user": {"id": "42"}, "after_channel_id": "555"}
-    )
+    await engine.dispatch({"type": "voice_state", "user": {"id": "42"}, "after_channel_id": "555"})
     voice.join.assert_awaited_once_with(555)
 
 
 async def test_ignores_other_users_voice_events() -> None:
     engine, hub, _, voice = make_engine()
-    await engine.dispatch(
-        {"type": "voice_state", "user": {"id": "999"}, "after_channel_id": "555"}
-    )
+    await engine.dispatch({"type": "voice_state", "user": {"id": "999"}, "after_channel_id": "555"})
     voice.join.assert_not_awaited()
 
 
 async def test_leaves_when_the_learner_leaves() -> None:
     engine, hub, _, voice = make_engine()
     voice.is_active = True
-    await engine.dispatch(
-        {"type": "voice_state", "user": {"id": "42"}, "after_channel_id": None}
-    )
+    await engine.dispatch({"type": "voice_state", "user": {"id": "42"}, "after_channel_id": None})
     voice.leave.assert_awaited_once()
 
 
@@ -88,7 +80,7 @@ async def test_leaves_when_the_learner_leaves() -> None:
 
 
 async def test_voice_model_failure_is_reported_not_raised() -> None:
-    import asyncio
+    import asyncio  # noqa: E402
 
     from teaching_agent.pi_rpc import PiRpcError
 
@@ -115,12 +107,12 @@ async def test_voice_model_failure_is_reported_not_raised() -> None:
 
 # -- turn-taking: PTT finalize + thinking fillers ----------------------------
 
-import asyncio
-import json
-from types import SimpleNamespace
+import asyncio  # noqa: E402
+import json  # noqa: E402
+from types import SimpleNamespace  # noqa: E402
 
-from teaching_agent.voice import conversation as conv
-from teaching_agent.voice.conversation import VoiceConversation
+from teaching_agent.voice import conversation as conv  # noqa: E402
+from teaching_agent.voice.conversation import VoiceConversation  # noqa: E402
 
 
 class FakeSTT:
@@ -132,8 +124,10 @@ class FakeSTT:
     async def start(self) -> None: ...
     def feed(self, pcm: bytes) -> None:
         self.fed += pcm
+
     def finalize(self) -> None:
         self.finalized += 1
+
     async def stop(self) -> None: ...
 
 
@@ -150,6 +144,7 @@ class FakeWS:
         async def gen():
             for m in self._messages:
                 yield json.dumps(m)
+
         return gen()
 
     async def send(self, data) -> None:
@@ -169,6 +164,7 @@ class HangingWS(FakeWS):
         async def gen():
             await asyncio.Event().wait()  # pends until the reader is cancelled
             yield
+
         return gen()
 
 
@@ -185,6 +181,7 @@ class ClosedWS(FakeWS):
 
             raise ConnectionClosedError(Close(1012, "service restart"), None)
             yield
+
         return gen()
 
 
@@ -259,9 +256,7 @@ async def test_no_filler_when_pi_is_fast(monkeypatch, tmp_path) -> None:
 
 
 async def test_missing_filler_dir_is_silent_noop(tmp_path) -> None:
-    conversation, _, ws = make_conversation(
-        [], filler_dir=tmp_path / "does-not-exist"
-    )
+    conversation, _, ws = make_conversation([], filler_dir=tmp_path / "does-not-exist")
     reply = await conversation._ask_with_fillers(conversation._generation, "hello")
     assert reply == "reply"
     assert not ws.sent
@@ -321,7 +316,7 @@ async def test_speaking_again_during_grace_cancels_flush(monkeypatch) -> None:
 
 # -- remote PTT: dual-mode turn boundary --------------------------------------
 
-from teaching_agent.voice.ptt import RemotePTT
+from teaching_agent.voice.ptt import RemotePTT  # noqa: E402
 
 
 def test_remote_ptt_mode_follows_heartbeat_freshness() -> None:
@@ -330,6 +325,7 @@ def test_remote_ptt_mode_follows_heartbeat_freshness() -> None:
     ptt.heartbeat()
     assert ptt.connected
     import time
+
     time.sleep(0.08)
     assert not ptt.connected  # lapsed heartbeat -> back to AUTO
 
@@ -404,7 +400,7 @@ async def test_ptt_routes_and_auth() -> None:
 
 # -- transports ---------------------------------------------------------------
 
-from teaching_agent.voice.transport import BridgeTransport, DiscordTransport
+from teaching_agent.voice.transport import BridgeTransport, DiscordTransport  # noqa: E402
 
 
 async def test_discord_transport_joins_hub_and_targets_learner() -> None:
@@ -449,15 +445,23 @@ async def test_stt_empty_speech_final_still_flushes_utterance() -> None:
     speech_final message whose transcript is empty (the Finalize response).
     The empty message must still flush the accumulated utterance — this was
     the 2026-10 dead-air bug: turns never fired."""
-    import json as _json
+    import json as _json  # noqa: E402
 
     from teaching_agent.voice.stt import DeepgramSTT
 
     messages = [
-        {"type": "Results", "is_final": True, "speech_final": False,
-         "channel": {"alternatives": [{"transcript": "what is recursion"}]}},
-        {"type": "Results", "is_final": True, "speech_final": True,
-         "channel": {"alternatives": [{"transcript": ""}]}},
+        {
+            "type": "Results",
+            "is_final": True,
+            "speech_final": False,
+            "channel": {"alternatives": [{"transcript": "what is recursion"}]},
+        },
+        {
+            "type": "Results",
+            "is_final": True,
+            "speech_final": True,
+            "channel": {"alternatives": [{"transcript": ""}]},
+        },
     ]
 
     class FakeDGSocket:
@@ -465,6 +469,7 @@ async def test_stt_empty_speech_final_still_flushes_utterance() -> None:
             async def gen():
                 for m in messages:
                     yield _json.dumps(m)
+
             return gen()
 
     stt = DeepgramSTT("key")
@@ -479,13 +484,17 @@ async def test_stt_empty_speech_final_still_flushes_utterance() -> None:
 async def test_stt_finalize_pending_fires_on_next_final_without_speech_final() -> None:
     """Deepgram's Finalize response is unreliable about speech_final; after
     a finalize() the next is_final with accumulated text IS the utterance."""
-    import json as _json
+    import json as _json  # noqa: E402
 
     from teaching_agent.voice.stt import DeepgramSTT
 
     messages = [
-        {"type": "Results", "is_final": True, "speech_final": False,
-         "channel": {"alternatives": [{"transcript": "what is recursion"}]}},
+        {
+            "type": "Results",
+            "is_final": True,
+            "speech_final": False,
+            "channel": {"alternatives": [{"transcript": "what is recursion"}]},
+        },
         # ...and then silence forever: no speech_final ever arrives.
     ]
 
@@ -494,6 +503,7 @@ async def test_stt_finalize_pending_fires_on_next_final_without_speech_final() -
             async def gen():
                 for m in messages:
                     yield _json.dumps(m)
+
             return gen()
 
     stt = DeepgramSTT("key")
@@ -512,15 +522,19 @@ from teaching_agent.voice.conversation import TranscriptSink  # noqa: E402
 
 def make_sink_conversation(ask_pi):
     sink = TranscriptSink(
-        learner=AsyncMock(), reply=AsyncMock(), unanswered=AsyncMock(),
+        learner=AsyncMock(),
+        reply=AsyncMock(),
+        unanswered=AsyncMock(),
         notice=AsyncMock(),
     )
     tts = AsyncMock()
     conv = VoiceConversation(
         transport=SimpleNamespace(
-            speaker_id="42", requires_channel=False,
+            speaker_id="42",
+            requires_channel=False,
             stream_url=lambda owner: "ws://x",
-            join=AsyncMock(), leave=AsyncMock(),
+            join=AsyncMock(),
+            leave=AsyncMock(),
         ),
         owner="o",
         stt=AsyncMock(),
@@ -543,7 +557,7 @@ async def test_learner_words_post_before_the_reply() -> None:
 
 
 async def test_interrupted_while_thinking_posts_unanswered() -> None:
-    import asyncio
+    import asyncio  # noqa: E402
 
     async def ask(text: str) -> str:
         await asyncio.Event().wait()  # thinks forever
@@ -563,7 +577,7 @@ async def test_interrupted_while_thinking_posts_unanswered() -> None:
 
 
 async def test_barge_in_marks_where_the_reply_was_cut() -> None:
-    import asyncio
+    import asyncio  # noqa: E402
     import contextlib
 
     async def ask(text: str) -> str:
@@ -599,7 +613,7 @@ async def test_barge_in_marks_where_the_reply_was_cut() -> None:
 async def test_unanswered_words_are_shelved_into_the_next_turn() -> None:
     """Interrupted words are never dropped from what pi sees: they ride
     along with the next turn, oldest first, any depth."""
-    import asyncio
+    import asyncio  # noqa: E402
     import contextlib
 
     asked: list[str] = []
@@ -640,7 +654,7 @@ async def test_edge_tts_retries_then_raises_after_exhaustion() -> None:
     retried; only total exhaustion raises TTSError (the conversation layer's
     text fallback then keeps the turn)."""
     import edge_tts
-    import pytest
+    import pytest  # noqa: E402
 
     from teaching_agent.voice.tts import EdgeTTS, TTSError
 
@@ -699,9 +713,7 @@ async def test_reconnect_gives_up_after_the_backoff_ladder(monkeypatch) -> None:
     ends — one warning line, no traceback wall."""
     conversation, _, _ = make_conversation([])
     conversation._ws = ClosedWS()  # noqa: SLF001
-    monkeypatch.setattr(
-        conv.websockets, "connect", AsyncMock(side_effect=OSError("refused"))
-    )
+    monkeypatch.setattr(conv.websockets, "connect", AsyncMock(side_effect=OSError("refused")))
     monkeypatch.setattr(conv, "_RECONNECT_DELAYS", (0.01, 0.01))
 
     await conversation._read_loop()  # noqa: SLF001
@@ -712,9 +724,9 @@ async def test_reconnect_gives_up_after_the_backoff_ladder(monkeypatch) -> None:
 
 # -- live transport swap (/voice action:transport) ----------------------------
 
-import pytest
+import pytest  # noqa: E402
 
-from teaching_agent.voice.runtime import VoiceError, VoiceRuntime
+from teaching_agent.voice.runtime import VoiceError, VoiceRuntime  # noqa: E402
 
 
 def make_runtime(monkeypatch, transport: str) -> tuple[VoiceRuntime, AsyncMock]:

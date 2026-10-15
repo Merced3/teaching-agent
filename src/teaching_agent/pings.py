@@ -95,9 +95,7 @@ class PingController:
         n = self.count() if count is None else count
         if n <= 0:
             return []
-        rng = random.Random(
-            f"{day.isoformat()}|{n}|{self._window_start}|{self._window_end}"
-        )
+        rng = random.Random(f"{day.isoformat()}|{n}|{self._window_start}|{self._window_end}")
         start = datetime.combine(day, self._window_start)
         end = datetime.combine(day, self._window_end)
         span = (end - start).total_seconds()
@@ -130,9 +128,7 @@ class PingController:
 
     def mark_fired(self, when: datetime | None = None) -> None:
         state = self._load()
-        self._save(
-            _State(pings_per_day=state.pings_per_day, last_fired=when or datetime.now())
-        )
+        self._save(_State(pings_per_day=state.pings_per_day, last_fired=when or datetime.now()))
 
     def next_fire(self, now: datetime | None = None) -> datetime | None:
         """Next slot to wait for; None when pings are off."""

@@ -51,20 +51,14 @@ class VoiceRuntime:
     def _make_transport(self, name: str) -> VoiceTransport:
         settings = self._settings
         if name == "bridge":
-            bridge_ws_url = settings.voice_bridge_url.replace(
-                "http://", "ws://"
-            ).replace("https://", "wss://")
-            return BridgeTransport(bridge_ws_url)
-        if name == "discord":
-            hub_ws_url = settings.hub_url.replace("http://", "ws://").replace(
+            bridge_ws_url = settings.voice_bridge_url.replace("http://", "ws://").replace(
                 "https://", "wss://"
             )
-            return DiscordTransport(
-                self._hub, hub_ws_url, settings.discord_allowed_user_id
-            )
-        raise VoiceError(
-            f"Unknown voice transport {name!r}. Available: discord, bridge"
-        )
+            return BridgeTransport(bridge_ws_url)
+        if name == "discord":
+            hub_ws_url = settings.hub_url.replace("http://", "ws://").replace("https://", "wss://")
+            return DiscordTransport(self._hub, hub_ws_url, settings.discord_allowed_user_id)
+        raise VoiceError(f"Unknown voice transport {name!r}. Available: discord, bridge")
 
     # -- introspection ------------------------------------------------------
 
@@ -112,9 +106,7 @@ class VoiceRuntime:
                 # Remote PTT exists only because Discord hides the learner's
                 # PTT key state; the bridge delivers exact press/release
                 # edges inside the stream itself.
-                remote_ptt=(
-                    self._remote_ptt if self._transport.requires_channel else None
-                ),
+                remote_ptt=(self._remote_ptt if self._transport.requires_channel else None),
             )
         await self._conversation.join(channel_id)
 
@@ -132,9 +124,7 @@ class VoiceRuntime:
         joins when a channel is known, otherwise the next voice_state event
         (the learner entering a channel) triggers the auto-join."""
         if name not in ("discord", "bridge"):
-            raise VoiceError(
-                f"Unknown voice transport {name!r}. Available: discord, bridge"
-            )
+            raise VoiceError(f"Unknown voice transport {name!r}. Available: discord, bridge")
         if name == self._transport_name:
             return name
         await self.leave()
@@ -206,6 +196,4 @@ class VoiceRuntime:
     @staticmethod
     def _require(name: str, registry: dict[str, Any], kind: str) -> None:
         if name not in registry:
-            raise VoiceError(
-                f"Unknown {kind} provider {name!r}. Available: {', '.join(registry)}"
-            )
+            raise VoiceError(f"Unknown {kind} provider {name!r}. Available: {', '.join(registry)}")

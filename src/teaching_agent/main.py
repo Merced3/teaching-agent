@@ -66,11 +66,7 @@ def build_engine(settings: Settings) -> TeachingEngine:
                 settings,
                 hub,
                 ask_pi=engine.ask_pi,
-                transcript=(
-                    engine.transcript_sink()
-                    if settings.voice_post_transcript
-                    else None
-                ),
+                transcript=(engine.transcript_sink() if settings.voice_post_transcript else None),
                 remote_ptt=remote_ptt,
             )
         )

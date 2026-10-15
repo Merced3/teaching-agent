@@ -4,7 +4,6 @@ every message — isolates Deepgram+conversion from the bridge transport."""
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 import sys
@@ -17,9 +16,10 @@ from dotenv import load_dotenv
 
 load_dotenv(".env")
 
-import numpy as np
-from simulate_page import make_speech_48k_mono
-from teaching_agent.voice.stt import DeepgramSTT
+import numpy as np  # noqa: E402
+from simulate_page import make_speech_48k_mono  # noqa: E402
+
+from teaching_agent.voice.stt import DeepgramSTT  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 
@@ -33,7 +33,8 @@ def mono_48k_to_16k(pcm: bytes) -> bytes:
 async def main() -> None:
     speech48 = await make_speech_48k_mono()
     pcm16 = mono_48k_to_16k(speech48)
-    print(f"clip: {len(pcm16) / 32000:.1f}s at 16kHz, peak {np.abs(np.frombuffer(pcm16, dtype=np.int16)).max()}")
+    peak = np.abs(np.frombuffer(pcm16, dtype=np.int16)).max()
+    print(f"clip: {len(pcm16) / 32000:.1f}s at 16kHz, peak {peak}")
 
     stt = DeepgramSTT(os.environ["DEEPGRAM_API_KEY"])
     stt.on_utterance = lambda t: print("UTTERANCE:", t)

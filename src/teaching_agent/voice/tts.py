@@ -116,9 +116,7 @@ class EdgeTTS(TTSProvider):
         mp3 = bytearray()
         last_error: Exception | None = None
         for attempt in range(1, self._ATTEMPTS + 1):
-            communicate = edge_tts.Communicate(
-                text, voice=self.voice_id, rate=self.rate
-            )
+            communicate = edge_tts.Communicate(text, voice=self.voice_id, rate=self.rate)
             mp3 = bytearray()
             try:
                 async for message in communicate.stream():
@@ -132,7 +130,9 @@ class EdgeTTS(TTSProvider):
             last_error = last_error or TTSError("edge-tts returned no audio")
             logger.warning(
                 "edge-tts attempt %d/%d produced no audio: %s",
-                attempt, self._ATTEMPTS, last_error,
+                attempt,
+                self._ATTEMPTS,
+                last_error,
             )
             if attempt < self._ATTEMPTS:
                 await asyncio.sleep(self._RETRY_BASE_SECONDS * attempt)
@@ -141,9 +141,7 @@ class EdgeTTS(TTSProvider):
                 f"edge-tts failed after {self._ATTEMPTS} attempts: {last_error}"
             ) from last_error
         try:
-            decoded = miniaudio.decode(
-                bytes(mp3), miniaudio.SampleFormat.SIGNED16, 1, 24000
-            )
+            decoded = miniaudio.decode(bytes(mp3), miniaudio.SampleFormat.SIGNED16, 1, 24000)
         except Exception as exc:
             raise TTSError(f"edge-tts mp3 decode failed: {exc}") from exc
         pcm = decoded.samples.tobytes()

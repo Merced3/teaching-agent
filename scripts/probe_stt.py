@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from simulate_page import make_speech_48k_mono
+
 from teaching_agent.voice.pcm import stereo_48k_to_mono_16k
 from teaching_agent.voice.stt import DeepgramSTT
 
@@ -42,6 +43,7 @@ async def main() -> None:
 
     fed = 0
     async with websockets.connect(f"{WS}/voice/stream?owner=probe-stt") as stream:
+
         async def read_stream() -> None:
             nonlocal fed
             async for msg in stream:

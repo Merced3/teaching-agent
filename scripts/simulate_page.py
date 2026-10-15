@@ -10,10 +10,7 @@ record whatever the agent speaks back. Run with the teaching-agent venv:
 from __future__ import annotations
 
 import asyncio
-import io
-import json
 import os
-import wave
 from pathlib import Path
 
 import httpx

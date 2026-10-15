@@ -201,7 +201,8 @@ class DeepgramSTT(STTProvider):
             if message.get("type") == "Results":
                 logger.debug(
                     "DG results: final=%s speech_final=%s",
-                    message.get("is_final"), message.get("speech_final"),
+                    message.get("is_final"),
+                    message.get("speech_final"),
                 )
             if message.get("type") != "Results":
                 continue

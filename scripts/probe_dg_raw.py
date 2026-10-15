@@ -16,8 +16,8 @@ from dotenv import load_dotenv
 
 load_dotenv(".env")
 
-from probe_deepgram import mono_48k_to_16k
-from simulate_page import make_speech_48k_mono
+from probe_deepgram import mono_48k_to_16k  # noqa: E402
+from simulate_page import make_speech_48k_mono  # noqa: E402
 
 URL = (
     "wss://api.deepgram.com/v1/listen"
@@ -32,6 +32,7 @@ async def main() -> None:
         URL,
         additional_headers={"Authorization": f"Token {os.environ['DEEPGRAM_API_KEY']}"},
     ) as ws:
+
         async def reader() -> None:
             async for raw in ws:
                 print("DG >>", raw[:400])

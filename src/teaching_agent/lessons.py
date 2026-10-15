@@ -182,9 +182,7 @@ class LessonManager:
             data = json.loads(self._state_file.read_text(encoding="utf-8"))
             self._thread_id = int(data["thread_id"])
             self._topic = str(data.get("topic") or "") or None
-            logger.info(
-                "Resumed active lesson %r (thread %s).", self._topic, self._thread_id
-            )
+            logger.info("Resumed active lesson %r (thread %s).", self._topic, self._thread_id)
         except (OSError, ValueError, KeyError, TypeError):
             self._thread_id = None
             self._topic = None

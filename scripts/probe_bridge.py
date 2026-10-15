@@ -30,13 +30,16 @@ async def main() -> None:
         pcm = (np.sin(2 * np.pi * 440 * t) * 20000).astype(np.int16).tobytes()
     else:
         import pathlib
+
         # reuse the TTS clip approach from simulate_page
         sys.path.insert(0, str(pathlib.Path(__file__).parent))
         from simulate_page import make_speech_48k_mono
+
         pcm = await make_speech_48k_mono()
 
     events: list[dict] = []
     async with websockets.connect(f"{WS}/voice/stream?owner=probe") as stream:
+
         async def read_stream() -> None:
             async for msg in stream:
                 if isinstance(msg, str):
