@@ -115,3 +115,53 @@ are cheap, many, and rewritable. The agent PROPOSES nodes and edges from
 session evidence; the map stays a "current best theory" (AGENTS.md), never
 authoritative. This is the actual open problem in learner modeling, not a
 mistake in the idea.
+
+## Addendum 2 (2026-10-16): learner decisions + homework results
+
+### Learner decisions
+
+1. **Storage must be project-agnostic.** The knowledge record should outlive
+   and out-travel this project — e.g. it should be able to feed a public
+   "star-system" visualization (nodes as stars, subjects as systems,
+   cross-subject links) without redesign. Constraint on the design: the
+   record is data + explicit edges; any UI is a replaceable viewer.
+2. **No vocabulary renaming.** The project's existing terms (evidence
+   levels, fades, retention win, edge node, owed pings) stay. FSRS terms
+   (stability, retrievability) are INTERNAL machinery — derived fields an
+   implementation may compute, never words the learner or docs must adopt.
+
+### Homework: how do graph-visualization apps store their data?
+
+- **Obsidian**: plain markdown files are the source of truth; `[[links]]`
+  live inside the text. A metadata cache (IndexedDB) is DERIVED from the
+  files and powers the graph view. Its Canvas feature = a JSON file with
+  `nodes` and `edges` arrays. (obsidian.md/help/data-storage)
+- **org-roam / Arcology**: org files parsed into SQLite tables —
+  `nodes(id, title, ...)`, `links(from_node, to_node, type)` — again:
+  files as truth, DB as a queryable derived index.
+- **Pattern**: the "Jarvis star-map" UI is ALWAYS a derived view over a
+  simple nodes+edges structure. Nobody stores the visualization. Force-
+  directed graph UIs just read nodes/edges JSON. This validates the
+  proposal's shape: nodes + edges + events as data, UIs and views as
+  replaceable projections.
+
+### Homework: has anyone worked on "what counts as one node"?
+
+Yes — it's a named, unsolved research problem: **knowledge-component (KC)
+granularity**.
+- KLI framework (Koedinger, Corbett, Perfetti 2012): a KC is "an acquired
+  unit of cognitive function inferred from performance on a set of related
+  tasks." KCs form hierarchies; granularity is a deliberate choice.
+- The trade-off is documented (Pelanek 2020; JEDM 2026 language-tutoring
+  study): finer KCs = more precise model but more maintenance, less data
+  per KC, noisier estimates; mid-level "semantically grounded" KCs
+  generalize best to new content. Best granularity depends on the goal —
+  there is no universal answer.
+- Multiple skills per task => the "credit assignment problem" (if the
+  learner fails, which KC is to blame?). Relevant to us: one probe answer
+  often touches several nodes; our coached/unaided + level annotations are
+  our credit-assignment data.
+- Practical guidance from the literature matches our instinct: start
+  coarse, SPLIT a node when errors show a hidden sub-skill (SimStudent
+  does exactly this automatically), MERGE when a fine node never changes
+  a decision. Nodes stay cheap and rewritable.
