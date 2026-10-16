@@ -624,3 +624,15 @@ Intervention: Agent-side conduct rule, no code. During the 2026-10-10..13 stretc
 Evidence: learner answered 4 of 5 questions posed this way (10-10 same day; 10-11 question answered 10-12 after one re-ask; 10-13 both halves after a plain re-ask), versus zero answers on any same-day second ping. Consistent with the new learner.md row (one-question-per-day cadence).
 
 Verdict: keep. The tick prompt's "ask ONE now" is now read as "one outstanding at a time"; if a future slot cadence (e.g. /pings 1/day) makes this moot, revisit.
+
+---
+
+## 2026-10-16 — Learner opts into recurring per-topic audit pings; one-outstanding-question rule gets a nuance
+
+Hypothesis: (a) A learner-requested recurring ping series on a specific node (the five-question audit) will hold retention better than agent-scheduled one-offs, because the learner predicted his own fade ("I feel like I'm going to forget them soon too"). (b) The 2026-10-13 "one outstanding question at a time" rule may be too strict: a second same-day ping CAN get answered when the first was already resolved that day.
+
+Intervention: (a) Standing schedule recorded in current-state + learner.md: Q5 receipt-half re-ping ~10-19..20, full audit ~10-22..23, gaps stretched if it holds. (b) No conduct change; just noted that the 10-16 second slot (idempotent/retry-safe) was answered same day — the rule stands as "one OUTSTANDING at a time," not "one per day."
+
+Evidence: 10-16 audit re-ping — Q2/Q3 recalled unaided, Q4 explained unaided, Q5 partial at ~3 days, versus Q2-5 ALL faded on 10-07 and 10-13; episode/mnemonic reps hypothesis strengthening. Second same-day ping answered in full (idempotent/retry-safe recalled unaided ~9 days, retention win).
+
+Verdict: adopt (a) as the first learner-directed recurring ping series; treat it as the pilot for "learner-scheduled retention" as a feature. Revisit (b) only if same-day second pings start getting ignored again.
