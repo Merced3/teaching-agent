@@ -71,3 +71,47 @@ From the same conversation. Learner's revised version lives in his notes.
   fast, prevent less and invest in detection and repair.
 - Already in the curriculum: precondition / write-before-send (irreversible
   double charge) vs reconciliation job (repair after the fact).
+
+## Addendum 2026-10-16 (design conversation, continued)
+
+### Vocabulary, in plain terms (from FSRS)
+
+- **Retrievability**: the chance the learner could recall node X right now.
+  Starts at 100% when learned, drains over time (forgetting curve).
+- **Stability**: how slowly it drains. Grows with each successful DELAYED
+  recall (the 6-week atomicity win made that memory's hole smaller), shrinks
+  on a fade. In the event-log design this is a **derived** field: recomputed
+  from the node's events, never hand-written. If it were stored directly it
+  would go stale the moment a new event arrived — this is why the event log
+  is the only thing that must be protected; every number is rebuildable.
+- **The 90% rule**: schedule a re-verification when retrievability is
+  predicted to hit ~90%. Ping at 99% = free pass, strengthens nothing,
+  wastes a ping. Ping at ~0% = re-teach from zero, expensive. ~90% is the
+  cheapest strengthening point. Today the LLM picks windows by feel in prose
+  ("re-ping ~Oct 19-20"); the proposal is that stability math SUGGESTS the
+  when, the LLM keeps the what and the override.
+
+### Why FSRS and this system schedule differently
+
+FSRS's constraint: millions of users, zero semantic input (one button press
+per card). Pure math is its best possible scheduler. This system's
+constraint: ONE learner, an LLM already reading the whole history. Judgment
+beats math when you can afford it: the agent picks WHAT to probe (fuzz
+points, cross-node links, mnemonic reps after repeat fades), not just WHEN.
+Trade-off: LLM judgment is inconsistent; math is consistent but shallow.
+
+### Learner idea (2026-10-16): discipline-agnostic nodes
+
+Nodes shouldn't know what discipline they hold. A generic record —
+`{ id, statement, prerequisite edges, evidence events }` — so ONE structure
+grows trees for any subject, and the map becomes data instead of prose.
+Close prior art: Knowledge Space Theory (ALEKS): items + prerequisite
+relations, discipline-agnostic.
+
+**The hard part (why the wording felt off): node identity.** What counts as
+ONE node is a judgment call no algorithm escapes ("keyed receipt": one node
+or five? "backoff/jitter split": a node or an edge?). Design answer: nodes
+are cheap, many, and rewritable. The agent PROPOSES nodes and edges from
+session evidence; the map stays a "current best theory" (AGENTS.md), never
+authoritative. This is the actual open problem in learner modeling, not a
+mistake in the idea.
