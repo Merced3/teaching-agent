@@ -4,6 +4,8 @@ A personal system for getting brought up to speed on anything, and staying curre
 
 **The opposite of brain rot.** Feeds give you content that washes over you and leaves nothing behind. This system is built so nothing washes over you: everything you consume gets stress-tested — retrieval, application, unannounced re-testing weeks later — and only what survives the stress counts as *known*. Evidence levels are recorded honestly; fluency is never mistaken for retention. Where brain rot optimizes for time-on-feed, this optimizes for durable capability per minute of effort.
 
+**Why this exists: you can only say no if you understand the constraints.** As AI writes more of the code, the builder's job shifts from *writing* to *judging*: understanding high-level inter-system components, weighing design trade-offs, and refusing the change that satisfies a pattern but breaks a core constraint. Anthropic's source-control team reports exactly this: their engineers rate Claude as better at writing code than themselves, yet "very often the role of the engineers was to tell Claude 'no'" ([Redesigning source control](https://www.anthropic.com/engineering/redesigning-source-control), believed-true as of 2026-10-16). An AI can generate code. It can't give you the understanding that tells you when to refuse it. That understanding has to be built and kept current in your own head, and that's what this system is for.
+
 **Start here:** `AGENTS.md`, then `docs/thesis.md`. **New session?** Use the prompt in `docs/session-handoff.md`.
 
 ## Layout
