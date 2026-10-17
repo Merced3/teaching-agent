@@ -636,3 +636,35 @@ Intervention: (a) Standing schedule recorded in current-state + learner.md: Q5 r
 Evidence: 10-16 audit re-ping — Q2/Q3 recalled unaided, Q4 explained unaided, Q5 partial at ~3 days, versus Q2-5 ALL faded on 10-07 and 10-13; episode/mnemonic reps hypothesis strengthening. Second same-day ping answered in full (idempotent/retry-safe recalled unaided ~9 days, retention win).
 
 Verdict: adopt (a) as the first learner-directed recurring ping series; treat it as the pilot for "learner-scheduled retention" as a feature. Revisit (b) only if same-day second pings start getting ignored again.
+
+---
+
+## 2026-10-17 — Owed live-verifications audit: 13 closed, 1 dropped, 1 drill scheduled (model: pi build session)
+
+Hypothesis: Most of the "NOT yet live-verified" debt accumulated since 2026-09-22 had already been proven incidentally by real use; the rest could be closed with cheap learner-run drills rather than new code.
+
+Intervention: Full inventory of every "not yet live-verified / pending live" claim in the decision log + current-state, cross-checked against server state (`data/pings.json`, `data/session-registry.json`), container logs, session logs, and learner testimony. No code changed.
+
+Evidence (per item, hypothesis → evidence → verdict):
+
+1. **First end-to-end run (owed since 09-22):** weeks of live traffic since; pings answered as recently as 10-16. VERIFIED (incidental).
+2. **Voice first live run / prosody hypothesis (09-22):** 09-29 entry "Voice live: first real conversation (verdict: WORKS)." VERIFIED (incidental).
+3. **Edge TTS voice in a real call (10-06):** same-day TTS root-cause entry: "live-verified by learner in a real voice call." VERIFIED (incidental).
+4. **Session registry crash-restart reattach (10-07):** unplanned container/host restarts during the 10-16..17 ops session (`git-parity-and-credentials`) produced `Reattached session 04343b4fd30e (owner=main)` in the boot log — twice (NEXT-BOOT consume date 10-16 + boot log 10-17 05:12). Registry survived hard restarts on disk. VERIFIED (live, unplanned). Residual: first turn on a reattached session not yet exercised — expected free via the next ping or learner message.
+5. **Live /close rotation (10-07):** server `session-registry.json` — session `88e4c2ca2a95` CLOSED 2026-10-16 19:18:26, fresh OPEN session created 1s later; plus close session logs 10-08/10-09/10-13. VERIFIED (real use).
+6. **Boot consuming NEXT-BOOT.md (10-07):** server KB has `NEXT-BOOT.consumed-2026-10-16.md` and the original deleted — the 10-16 handoff (written at the 19:18 close) was consumed by the next real boot; consumed files 10-07→10-14 predate. VERIFIED (live).
+7. **Real ping slot fire (10-09):** deterministic slot math reproduced off-repo — 10-16 slots computed as 08:34:44 / 13:02:40 / 19:17:19 vs `last_fired` 19:17:23 (4s after slot 3); answered-ping session logs 10-10, 10-12, 10-13, 10-15, 10-16; four documented SILENT slots. VERIFIED (real use).
+8. **Auto-created lesson thread + kickoff brief (10-08):** 10-09 backoff-jitter brief posted as thread opener (post duplicate-fix); timeout-tail thread same night. VERIFIED (real use).
+9. **Lesson wrap-up, human-only /lesson end (10-07):** 10-09 timeout-tail lesson closed with full extraction (`sessions/2026-10-09-timeout-tail-closed.md`). VERIFIED (real use).
+10. **Mid-call bridge restart → reconnect ladder (10-09):** OUTCOME same night — voice-bridge killed mid-session, clean 1012 line, "reconnected (attempt 4)", session alive. VERIFIED (live drill).
+11. **`/pings status` (10-09):** learner ran it 10-17; reply "Pings: 3/day, window 08:00–23:00. Remaining today: 11:44, 12:37, 19:47." — matches `describe()`. VERIFIED (live).
+12. **`/pings off` (10-09):** learner ran it 10-17; ack received and `pings.json` persisted `pings_per_day: 0`. Full "stops them" half completes with the catch-up drill below (slots 11:44 + 12:37 UTC pass unfired while off). VERIFIED (live; stop-evidence pending same drill).
+13. **Filler phrase cadence (10-06):** learner testimony — "loading an answer" heard multiple times in real voice lessons; "more than works." VERIFIED (learner).
+14. **Two-part utterance / interruption (10-09):** learner testimony — interrupts are rare in his usage but work when used; confidently verified. VERIFIED (learner). The precise "during a filler" sub-case folds into this; shelved-words path remains test-pinned.
+15. **`/voice action:transport` swap each way (10-09):** learner testimony — used both directions multiple times, works. VERIFIED (learner).
+16. **Edge-tts blip recovering via retry (10-08):** DROPPED by learner — cannot be forced safely (transient free-endpoint hiccup; failure injection on the 1 GB droplet is more risk than value). Retry (exactly 3 attempts → TTSError) and degrade-to-text-with-notice are pinned by tests; the failure mode is a posted ⚠️ notice, never a lost turn. If the retry log line ever appears naturally, it self-documents.
+17. **Ping catch-up after downtime (10-09):** drill scheduled for today — pings left OFF past slots 11:44 + 12:37 UTC, learner re-enables with `/pings settings:3`; prediction: exactly ONE catch-up tick fires within ~5 min of re-enable (missed slots collapse to the latest; `mark_fired` records even a SILENT tick, so `pings.json` is the evidence either way), then the 19:47 UTC slot fires normally. Verdict pending learner's re-enable; addendum to follow.
+
+Side finding (not a failure, no action taken): `PingController.due()` only inspects the CURRENT day's slots, so downtime crossing midnight silently drops that day's unfired slots. The 10-16→17 overnight downtime missed nothing only because the day's last slot (19:17) had already fired. Acceptable per the "collapse to one catch-up, never a backlog" design; noted here so a future session doesn't mistake it for a bug.
+
+Verdict: keep everything. The verification-debt model worked — most debt dissolved against evidence of real use, and the remainder yielded to testimony + one scheduled drill. Zero code changes.
