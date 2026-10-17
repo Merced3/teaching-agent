@@ -46,8 +46,9 @@ automation-harness is a library installed into each app, not a process.
 
 - The repo working copy: `docs/`, `maps/`, `sessions/`, `lessons/` ARE the
   knowledge base. The agent git-commits at session close; push to origin
-  is the backup. (Consider a periodic `git push` cron until pushes are
-  automatic.)
+  is the backup. Since 2026-10-17 a server cron pushes every 15 min
+  (`ops/server/kb-push.sh` — push-only, never pulls; failures logged to
+  `logs/kb-push.log`, reconcile divergences by hand).
 - `data/` (pi sessions, harness state) — disposable; recreate freely.
 
 ## Known follow-ups
