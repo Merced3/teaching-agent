@@ -670,3 +670,23 @@ Side finding (not a failure, no action taken): `PingController.due()` only inspe
 Verdict: keep everything. The verification-debt model worked — most debt dissolved against evidence of real use, and the remainder yielded to testimony + one scheduled drill. Zero code changes.
 
 OUTCOME (2026-10-17, same day): catch-up drill PASSED. Learner re-enabled at ~13:19 UTC (`/pings 3`, ack: "Remaining today: 19:47") after slots 11:44 + 12:37 UTC had passed with pings OFF (neither fired — completes item 12's "stops them" half). Exactly ONE catch-up tick fired at 13:21:08 (turns 0→1 on reattached session 04343b4fd30e, one pi run $0.0156, `last_fired` 13:21:20) — two missed slots collapsed to one, and the tick posted a real recall check (non-SILENT) to the channel. Side effect: this was the first functional turn on the crash-reattached session, closing item 4's residual. The 19:47 UTC slot is the ordinary fire path already verified under item 7; not separately watched. ALL owed live-verifications are now closed: 16 verified + 1 dropped.
+
+---
+
+## 2026-10-20 — Rep-form switch for chronic faders (verbal → production)
+
+Hypothesis: a lookup detail that has faded ~6x under verbal ping + re-presentation (the keyed-receipt retry-MOVE: don't re-execute, return the recorded result) is not being failed by memory alone — the rep form is wrong. Producing the mechanism in code forces the decision structure that verbal recall lets him skip.
+
+Intervention: after a PARTIAL verbal answer on the morning ping, re-asked as a single-action production prompt ("walk me through what your code does, step by step"). Learner hand-wrote the retry handler + reconciliation job pseudocode.
+
+Evidence: full correct handler produced UNAIDED (lookup-first, no re-execute, all three branches, bounded job, human escalation) hours after the morning re-presentation — plus unprompted transfer (rate-limit slow_down from the backoff/jitter node). Caveat: same-day as re-presentation, so this is production-grade, NOT retention-grade. Verbal re-presentation alone had failed to convert this node across ~6 fades since 10-02.
+
+Verdict: keep — chronic lookup-detail faders get production reps, not more re-explanation. Cold re-probe after a real delay is the verdict's open condition; folded into post-audit checks.
+
+## 2026-10-20 — Ping question form: one plain single-clause ask
+
+Hypothesis: compound ping questions ("what do you do, AND what does the caller learn?") depress answer quality independent of knowledge.
+
+Evidence: learner flagged the morning question himself ("the question was confusing... didn't exactly know what I was answering"); the single-clause re-ask hours later produced his strongest work on the node since 10-03. Extends the 2026-10-13 multi-part finding to multi-clause.
+
+Verdict: keep — pings ask one plain thing; if a probe needs two parts, send the second only after the first is answered.
