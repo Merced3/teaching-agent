@@ -22,3 +22,6 @@ voice-test*.wav
 
 # Generated audio output (thesis reads, filler clips — reproducible via tools/)
 out/
+
+# Knowledge-log derived views (regenerable via scripts/kb_derive.py)
+kb/derived/

@@ -52,4 +52,6 @@ When the learner asks for a plan, says "before creating/changing anything," or r
 ## Session discipline
 
 - Start at the handoff, not from chat memory.
-- End sessions by updating `current-state.md` and the decision log so the next session — any model, any harness — can resume with minimal drift.
+- Evidence is recorded as **events**, not prose: append one event per node touched via `python scripts/kb_append.py --kb kb append --event '{...}'` (level + `delay_days` + `coached`; see docs/proposals/knowledge-storage.md). `kb/events.jsonl` is the source of truth and `kb_append.py` is the ONLY write path — never edit the log files directly.
+- `docs/current-state.md` is a **generated view** (`python scripts/kb_derive.py --kb kb current-state > docs/current-state.md`) — never hand-edit it. Regenerate it after appending events.
+- End sessions by recording events, regenerating the view, and updating the decision log so the next session — any model, any harness — can resume with minimal drift.
