@@ -35,7 +35,10 @@ def run_cli(script: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 def append(kb: Path, event: dict) -> subprocess.CompletedProcess[str]:
-    return run_cli(APPEND, "--kb", str(kb), "append", "--event", json.dumps(event))
+    args = ["--kb", str(kb), "append", "--event", json.dumps(event)]
+    if not (kb / "events.jsonl").exists():
+        args.append("--init")  # first write to a fixture log: genesis is explicit
+    return run_cli(APPEND, *args)
 
 
 def evidence_event(node: str, level: str, **overrides) -> dict:
@@ -168,3 +171,36 @@ def test_migrated_sample_round_trips(tmp_path: Path) -> None:
     node = next(g for g in grades if "atomic" in g.lower())
     assert grades[node]["level"] == "recalled"
     assert grades[node]["retention"] is True
+
+
+# 5. Genesis guard: the append CLI refuses to start a NEW hash chain when
+#    events.jsonl is absent — a wrong --kb path looks exactly like a fresh
+#    KB, and silently forking history is how incident 1 of the 2026-10-23
+#    migration-flag review happened. Initializing a new log requires the
+#    explicit --init flag; --init on an existing log is refused too.
+def test_append_refuses_genesis_without_init(tmp_path: Path) -> None:
+    kb = tmp_path / "kb"
+    kb.mkdir()
+    log = kb / "events.jsonl"
+    event = json.dumps(evidence_event("sd/atomicity", "recalled", delay_days=6))
+
+    # Absent log, no --init: refused, and nothing is created.
+    refused = run_cli(APPEND, "--kb", str(kb), "append", "--event", event)
+    assert refused.returncode != 0
+    assert "--init" in refused.stderr
+    assert not log.exists()
+
+    # Absent log with --init: the genesis append is allowed.
+    genesis = run_cli(APPEND, "--kb", str(kb), "append", "--event", event, "--init")
+    assert genesis.returncode == 0
+    assert len(log.read_text(encoding="utf-8").splitlines()) == 1
+
+    # --init on an existing log: refused (drop --init to append normally).
+    again = run_cli(APPEND, "--kb", str(kb), "append", "--event", event, "--init")
+    assert again.returncode != 0
+    assert len(log.read_text(encoding="utf-8").splitlines()) == 1
+
+    # Normal append on the existing log still works.
+    ok = run_cli(APPEND, "--kb", str(kb), "append", "--event", event)
+    assert ok.returncode == 0
+    assert len(log.read_text(encoding="utf-8").splitlines()) == 2
