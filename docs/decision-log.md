@@ -690,3 +690,15 @@ Hypothesis: compound ping questions ("what do you do, AND what does the caller l
 Evidence: learner flagged the morning question himself ("the question was confusing... didn't exactly know what I was answering"); the single-clause re-ask hours later produced his strongest work on the node since 10-03. Extends the 2026-10-13 multi-part finding to multi-clause.
 
 Verdict: keep — pings ask one plain thing; if a probe needs two parts, send the second only after the first is answered.
+
+---
+
+## 2026-10-21 — Knowledge-storage design APPROVED: append-only evidence events as source of truth
+
+Hypothesis: Making an append-only log of evidence events the source of truth (with current-state, owed pings, and internal scheduling fields as derived, regenerable views) removes commit-ceremony friction and stops routing from depending on re-reading prose — without renaming the project's vocabulary or locking the record to this project.
+
+Intervention: Un-shelved docs/proposals/knowledge-storage.md in a dedicated design session. Learner resolved all open questions (see "Adopted design (2026-10-21)" in the proposal): reframe confirmed (record = evidence; prediction = one derived use); one event per node touched for credit assignment; JSONL in /kb with git demoted to nightly snapshot (out of the write path); a CLI append tool as the ONLY write path (the log is a write boundary, invariant enforced on every write — the same lesson as payments); migration by script + human review, lossy spots flagged not guessed. Wrote four behavior-level black-box tests (tests/test_knowledge_log.py) that FAIL now (nothing implemented), committed xfail so CI stays green. NO src changes; the build is session #6 after the learner approves the tests.
+
+Evidence (the two needs, per the meta-rule): (1) commit friction — the agent's write path went through git, a human-paced ceremony, ~10x/day (the 2026-10-16 "dubious ownership" fix fixed the symptom, not the cause); (2) routing done by re-reading prose — current-state.md's hand-rolled "Prior: ... Prior: ..." chain is an event log packed into one mutable file, re-read by the LLM every session to work out what's owed and what faded: expensive, lossy, and a growing cost driver (see the 2026-10-19 session-cost discussion in current-state).
+
+Verdict: keep — design approved by the learner 2026-10-21. Gate to implementation: learner approves the xfail tests.
