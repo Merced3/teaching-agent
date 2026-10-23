@@ -690,3 +690,11 @@ Hypothesis: compound ping questions ("what do you do, AND what does the caller l
 Evidence: learner flagged the morning question himself ("the question was confusing... didn't exactly know what I was answering"); the single-clause re-ask hours later produced his strongest work on the node since 10-03. Extends the 2026-10-13 multi-part finding to multi-clause.
 
 Verdict: keep — pings ask one plain thing; if a probe needs two parts, send the second only after the first is answered.
+
+## 2026-10-23 (ping rep form) — production reps: pseudocode → plain-English walkthrough
+
+Hypothesis: the pseudocode production rep measures what it should (cold production of handler logic), not extraneous code-syntax difficulty.
+
+Evidence: the 10-22 receipt-retry production rep, answered in pseudocode, put `Skip;` on the retry path — scored as the 7th fade of the receipt-purpose detail. On one plain prompt the learner self-corrected instantly and completely ("skips to checking the result... doesn't send a new payment request") and said himself "I'm bad at writing pseudocode." The concept had held cold; the syntax was the failure layer. Struggle belongs in the material (the logic), not the notation (spine 4).
+
+Verdict: change — production reps are plain-English handler walkthroughs from now on; same cold-production demand, no syntax noise. Effect on recall evidence to be watched at the ~2026-10-26 cold re-probes.
