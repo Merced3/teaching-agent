@@ -19,9 +19,12 @@ We are working on my personal learning system in:
 Before teaching, planning, or changing anything:
 
 1. Read AGENTS.md completely — especially the spine, the meta-rule, and the evidence rules.
-2. Read docs/thesis.md, docs/learner.md, docs/current-state.md, docs/decision-log.md,
-   docs/goal.md (what the learner is shooting for), and docs/routing.md (how the next
-   node is computed).
+2. Read docs/thesis.md, docs/learner.md, docs/current-state.md (**GENERATED — do not
+   hand-edit**; the source of truth is `kb/events.jsonl`, read it for raw evidence),
+   docs/decision-log.md, docs/goal.md (what the learner is shooting for), and
+   docs/routing.md (how the next node is computed). Until the migration review
+   (PR #1, 40 flags) is complete, the pre-log prose state — owed pings, routing
+   context — lives in `docs/archive/current-state-2026-10-23.md`; read it too.
 3. Check for any maps/ or sessions/ folders and read the most recent files.
 4. Summarize back to me: the purpose, the loop, my current known state, and the next milestone — in under 10 sentences. If anything conflicts or is stale, say so.
 
@@ -35,7 +38,12 @@ Today's goal: <one sentence>
 
 ## Closing a session — the agent must do this
 
-1. Update `docs/current-state.md`: what was taught, what was demonstrated (unaided vs. coached), what's next, and which model(s) were used (files must not mislabel the model).
+1. Record evidence as **events**, one per node touched, through the ONLY write path:
+   `python scripts/kb_append.py --kb kb append --event '{"type":"evidence","ts":"<ISO>","node":"<id>","level":"<level>","delay_days":<n>,"coached":<bool>,"channel":"<channel>","session":"sessions/<file>.md","notes":"<what was demonstrated, unaided vs coached>"}'`.
+   Then regenerate the view: `python scripts/kb_derive.py --kb kb current-state --out docs/current-state.md`
+   (GENERATED — never hand-edit; your shell blocks redirection, so the `--out` flag does the file write).
+   Also note which model(s) were used in the session log (files must not mislabel the model).
+   Do NOT commit to git — the nightly snapshot cron handles history.
 2. Update `docs/learner.md` if anything true was learned about this mind — with status (`confirmed` / `observed` / `hypothesis`) and evidence.
 3. Append any experiments or approach changes to `docs/decision-log.md`.
 4. If any taught claim is time-sensitive, note its `current as of` date.
@@ -52,16 +60,18 @@ At every session start — and always when the learner says "it's been a while" 
 
 ## Conventions
 
-- Paragraphs in `maps/`, `sessions/`, and `docs/current-state.md` are stored as single
+- Paragraphs in `maps/`, `sessions/`, and prose docs are stored as single
   unwrapped lines — robust for the exact-match scripted edits agents use. Wrapped prose is
   human-nicer; check file form before scripted edits either way.
+- `docs/current-state.md` is GENERATED from `kb/events.jsonl` by `scripts/kb_derive.py` —
+  never hand-edit it; change the events, then regenerate.
 - The handoff prompt omits a `Model:` line on purpose; fill it at close with the actual
   model(s).
-- Lecture episodes (`/lecture`) are recorded in `docs/current-state.md` as
-  `episode generated (<date>), UNPROBED` plus one line on what it covers, the moment they
-  are generated. Listening is `presented` — nothing more. An episode stays UNPROBED until a
-  recall check probes its content; then record the result as level + elapsed time and drop
-  the UNPROBED mark.
+- Lecture episodes (`/lecture`) are recorded as an evidence event with level `presented`
+  and `UNPROBED` in the notes, the moment they are generated (node = the episode's topic).
+  Listening is `presented` — nothing more. An episode stays UNPROBED until a recall check
+  probes its content; then append the result as level + `delay_days` (a new event) —
+  history is never rewritten.
 
 ## Drift test
 

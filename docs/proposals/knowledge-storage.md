@@ -1,8 +1,10 @@
-# Proposal (SHELVED): how learner knowledge is stored
+# Proposal (APPROVED): how learner knowledge is stored
 
-Status: **shelved, not approved.** Written 2026-10-16 from an ops/design
-conversation. Do not implement without explicit learner approval (AGENTS.md
-approval boundary). Pick it up when a session is dedicated to it.
+Status: **APPROVED 2026-10-21** (design session; learner resolved the open
+questions below — see "Adopted design (2026-10-21)" at the bottom). Original
+shelving note: written 2026-10-16 from an ops/design conversation. The build
+is the NEXT session (#6); this session delivered design + failing tests only.
+No src was touched.
 
 ## The trigger (surface issue, already fixed)
 
@@ -165,3 +167,75 @@ granularity**.
   coarse, SPLIT a node when errors show a hidden sub-skill (SimStudent
   does exactly this automatically), MERGE when a fine node never changes
   a decision. Nodes stay cheap and rewritable.
+
+## Adopted design (2026-10-21 — learner decisions, build is session #6)
+
+Open questions resolved with the learner:
+
+1. **Framing: CONFIRMED.** Record = evidence (what happened). Prediction is
+   one derived use of it (scheduling suggestions), never the record's
+   identity.
+2. **Credit assignment: one event per node touched.** A multi-node probe
+   answer is split by the agent into separate per-node events, each with its
+   own level/outcome and coached/unaided annotation. The coached/unaided flag
+   is our credit-assignment data (per the KC-granularity homework).
+3. **Storage: JSONL in /kb; git leaves the write path.** Two append-only
+   JSONL files live in the knowledge base (`kb/events.jsonl`,
+   `kb/nodes.jsonl`). The agent writes by plain append — no commit ceremony.
+   A nightly cron takes a git snapshot (history tool, run outside pi) and the
+   existing nightly backup covers disaster recovery. Friction sits where loss
+   is irreversible; the log is the only thing that must be protected.
+4. **Write path: a CLI the agent calls; the log IS a write boundary.**
+   `scripts/kb_append.py` is the ONLY way events get written. It validates
+   the schema and enforces the invariants on every write; pi never edits the
+   log files directly. (Same lesson as the payments write boundary: the
+   invariant is enforced on every write path, so there is exactly one path.)
+5. **Migration: script + human review pass.** A migration script parses the
+   current-state "Prior:" chain and `sessions/*.md` into candidate events;
+   the learner reviews them. Lossy/unparseable spots are FLAGGED (recorded
+   as `unverified` or skipped), never guessed.
+6. **Meta-rule satisfied.** The two needs are (1) commit-ceremony friction
+   on the agent's write path and (2) routing computed by re-reading prose.
+   Adoption is logged in `docs/decision-log.md` (2026-10-21).
+
+### Data model (plain data, project-agnostic, viewer-replaceable)
+
+- **`kb/events.jsonl`** — one JSON object per line, append-only, hash-chained
+  (`prev` = sha256 of the previous line; the append CLI verifies the chain
+  before writing, so any rewrite of history makes the next append fail).
+  Event types:
+  - `evidence` — `{v, ts, type:"evidence", node, level, delay_days, coached,
+    channel, session, notes, prev}`. `level` uses the project's own
+    vocabulary: `presented | recognized | recalled | explained | applied |
+    transferred` (`recalled` = recalled unaided; `coached:true` marks a
+    coached/prompted answer). `delay_days` is a separate field — delay is a
+    dimension, never folded into the level (AGENTS.md).
+  - `node_created` — `{node, statement, edges:[{to, kind:"prerequisite"|"related"}]}`
+  - `node_split` / `node_merge` — per the KC-granularity decision: split when
+    errors reveal a hidden sub-skill, merge when a node never changes a
+    decision.
+  - `claim_asserted` / `claim_rechecked` — the epistemic axis ("believed true
+    as of <date>, source <X>").
+  - `routing_override` — learner overrides are data.
+- **`kb/nodes.jsonl`** — append-only node-lifecycle events (create/split/
+  merge). Nodes are cheap, many, rewritable; the current node set is a
+  DERIVED view, so restructuring never rewrites history. Edges are explicit
+  data (the future star-system viewer reads nodes+edges+events; any UI is a
+  replaceable projection — validated by the Obsidian/org-roam homework).
+- **Everything else is derived and regenerable**: current-state view, owed
+  pings, per-node internal derived fields (stability / retrievability —
+  internal machinery only, never vocabulary the learner or docs must adopt).
+  Math SUGGESTS the when (~90% retrievability); the LLM keeps the what and
+  the override.
+
+### Invariants (enforced, and tested — see tests/test_knowledge_log.py)
+
+- **Append-only.** History is never rewritten; tampering breaks the hash
+  chain and the append CLI refuses to write.
+- **Deterministic derivation.** The derived view regenerates byte-identically
+  from the same log; deleting derived artifacts and rebuilding loses nothing.
+- **Never upgrade past evidence.** The derived grade for a node never exceeds
+  what its events justify (a `presented` event can't yield a `known` claim; a
+  coached event can't yield an unaided claim; a retention claim requires
+  `delay_days > 0`).
+- **Migration honesty.** Unparseable source text is flagged, not guessed.

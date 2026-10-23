@@ -40,7 +40,7 @@ _SILENT = "SILENT"
 
 _COMMANDS = [
     {"name": "recall", "description": "Run any recall checks that are due, right now."},
-    {"name": "close", "description": "Close the session: update the knowledge base and commit."},
+    {"name": "close", "description": "Close the session: record evidence events and wrap up."},
     {
         "name": "next",
         "description": "What should I focus on? Owed recall checks + the recommended next lesson.",
@@ -144,10 +144,16 @@ _COMMAND_PROMPTS = {
     ),
     "close": (
         "The learner ran /close. Run the full session-closing checklist from "
-        "docs/session-handoff.md: update docs/current-state.md, docs/learner.md if "
-        "anything true was learned, append to docs/decision-log.md if any approach "
-        "changed, record the next owed recall check, write a session log under "
-        "sessions/, then commit the changes to git. Confirm briefly what you wrote."
+        "docs/session-handoff.md: record evidence as events through "
+        "python scripts/kb_append.py (one event per node touched — the ONLY "
+        "write path for kb/events.jsonl), then regenerate the view with "
+        "python scripts/kb_derive.py --kb kb current-state --out "
+        "docs/current-state.md (GENERATED — never hand-edit it). Update "
+        "docs/learner.md if anything true was learned, append to "
+        "docs/decision-log.md if any approach changed, record the next owed "
+        "recall check in sessions/NEXT-BOOT.md, and write a session log under "
+        "sessions/. Do NOT commit to git — the nightly snapshot cron handles "
+        "history. Confirm briefly what you wrote."
     ),
     "next": (
         "The learner ran /next. Check the real date (the [date:] prefix), then read "
@@ -192,13 +198,15 @@ _LECTURE_WRITE_PROMPT = (
 
 _LECTURE_RECORD_PROMPT = (
     "A lecture episode was just generated: source {source} (~{words} words, "
-    "about {minutes:.0f} minutes), audio {audio}. Record it in "
-    "docs/current-state.md as an episode generated on {today} and UNPROBED, "
-    "with one line on what it covers, so a later /recall can probe its "
-    "content (listening = presented; nothing more). Then commit the episode "
-    "files and the current-state update to git — the intake record is "
-    "durable evidence and should not wait for session close. Reply with "
-    "exactly: SILENT"
+    "about {minutes:.0f} minutes), audio {audio}. Record it as an "
+    "evidence event through python scripts/kb_append.py (level presented, "
+    "UNPROBED + one line on what it covers in the notes, node = the "
+    "episode's topic, ts = {today}), so a later /recall can probe its "
+    "content (listening = presented; nothing more) — the intake record "
+    "is durable evidence and should not wait for session close. Do NOT "
+    "hand-edit docs/current-state.md (it is GENERATED) and do NOT commit to "
+    "git — the nightly snapshot cron handles history. Reply with exactly: "
+    "SILENT"
 )
 
 # Lesson kickoff (2026-10-08): a lesson start backfills the fresh session
@@ -230,8 +238,10 @@ _TEST_MODE_TOOLS = ("read", "grep", "find", "ls")
 _CLOSE_RESUME_PROMPT = (
     "Boot recovery: the previous session was interrupted mid-close (state "
     "CLOSING in the session registry). Finish the closing checklist from "
-    "docs/session-handoff.md now — update the knowledge base and commit — "
-    "then confirm briefly what you wrote."
+    "docs/session-handoff.md now — record the evidence events through "
+    "python scripts/kb_append.py and regenerate docs/current-state.md with "
+    "python scripts/kb_derive.py (no git commit; the snapshot cron handles "
+    "history) — then confirm briefly what you wrote."
 )
 
 
@@ -261,7 +271,12 @@ def build_system_prompt(settings: Settings, *, test_mode: bool) -> str:
         "block: that is the previous session's handoff note. Read it FIRST, "
         "before docs/current-state.md — the owed recall checks in it are the "
         "easiest thing to drop between sessions.",
-        "- Git-commit knowledge-base changes at session close.",
+        "- Evidence is recorded as events: python scripts/kb_append.py is the "
+        "ONLY write path for kb/events.jsonl (one event per node touched: "
+        "level + delay_days + coached). docs/current-state.md is GENERATED "
+        "(python scripts/kb_derive.py --kb kb current-state --out "
+        "docs/current-state.md) — never hand-edit it. No git commits: the "
+        "nightly snapshot cron handles history.",
         "- You teach, you do not build: your write/edit tools only reach the "
         "knowledge base (docs/, maps/, sessions/, lessons/) and your shell is "
         "read-only plus git. This is enforced at the tool level — attempts to "
@@ -673,7 +688,7 @@ class TeachingEngine:
         note = (
             "TEST MODE ON — knowledge-base writes are off (I have no write tools)."
             if want_test
-            else "LIVE MODE — session close will write to the knowledge base and commit."
+            else "LIVE MODE — session close records evidence events to the knowledge log."
         )
         await self._hub.post_followup(interaction_id, note, ephemeral=False)
 
