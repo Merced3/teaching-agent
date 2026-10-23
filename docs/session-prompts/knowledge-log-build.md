@@ -8,17 +8,18 @@
 
 Copy everything below the line into the new session.
 
-**STATUS 2026-10-23.** Steps 1–2 done on branch `knowledge-log-build`, PR #1 open
+**STATUS 2026-10-23.** Steps 1–3 done on branch `knowledge-log-build`, PR #1 open
 (learner merges — KB write path): `scripts/kb_append.py` (write boundary),
 `scripts/kb_derive.py`, `scripts/kb_migrate.py` built; the 4 approved tests
 un-xfailed and green (115 passed, ruff clean, approved test bodies untouched);
 real Prior-chain migration run — 3 confident events + 40 flags in
-`kb/events.jsonl` awaiting learner review; decision-log entry written. Still
-owed (needs the learner / droplet): review of the 40 flags, cutover wording
-approval (`docs/session-handoff.md` + `AGENTS.md` session-discipline — spine
-rule), nightly git-snapshot cron in ops, then merge → deploy → watch one real
-ping + one real `/close` through the event log, then tick #6. Outcome details
-at the bottom of this file. The text below the line is preserved as-run.
+`kb/events.jsonl` awaiting learner review; cutover DONE with explicit learner
+approval (AGENTS.md + session-handoff.md wording, current-state.md now the
+GENERATED view, prose archived in docs/archive/); decision-log entry written.
+Still owed: review of the 40 flags, nightly git-snapshot cron in ops, then
+merge → deploy → watch one real ping + one real `/close` through the event log,
+then tick #6. Outcome details at the bottom of this file. The text below the
+line is preserved as-run.
 
 ---
 
@@ -81,10 +82,13 @@ roadmap.
    `kb/events.jsonl`. The flags are mostly multi-node entries needing the human
    credit-assignment split (one event per node touched) — as the design
    predicted. Markdown history untouched (stays the archive).
-4. **Step 3 (cutover) — NOT done, needs explicit learner approval (spine rule).**
-   Pending: pi appends via `kb_append.py`; `current-state.md` becomes the
-   generated view (GENERATED header); wording changes to
-   `docs/session-handoff.md` + `AGENTS.md` session discipline.
+4. **Step 3 (cutover) — DONE 2026-10-23 with explicit learner approval (spine rule
+   satisfied).** `AGENTS.md` session discipline rewritten (evidence = events via
+   `kb_append.py`; current-state = generated view, never hand-edited);
+   `docs/session-handoff.md` open/close + conventions updated (UNPROBED episodes
+   now `presented` events); prose current-state archived untouched at
+   `docs/archive/current-state-2026-10-23.md`; `docs/current-state.md` is now
+   GENERATED. 115 passed, ruff clean.
 5. **Step 4 (merge/deploy/watch) — NOT done.** PR #1 open; learner merges;
    deploy is automatic on merge; one real ping + one real `/close` through the
    event log on the droplet still owed. Nightly git-snapshot cron (outside pi's
