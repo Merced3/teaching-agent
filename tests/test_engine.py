@@ -155,9 +155,11 @@ async def test_strangers_cannot_toggle_mode() -> None:
 async def test_pings_set_count_and_status() -> None:
     engine, hub, pi = await _started()
     await engine.dispatch(command("pings", {"setting": "2"}))
+    await __import__("asyncio").sleep(0)  # /pings defers; let the task run
     assert engine._pings.count() == 2  # noqa: SLF001
     hub.post_followup.assert_awaited()
     await engine.dispatch(command("pings", {"setting": "status"}))
+    await __import__("asyncio").sleep(0)
     last = hub.post_followup.await_args.args[1]
     assert "2/day" in last
 
@@ -165,10 +167,12 @@ async def test_pings_set_count_and_status() -> None:
 async def test_pings_off_and_resume() -> None:
     engine, hub, pi = await _started()
     await engine.dispatch(command("pings", {"setting": "off"}))
+    await __import__("asyncio").sleep(0)  # /pings defers; let the task run
     assert engine._pings.count() == 0  # noqa: SLF001
     assert engine.ping_due() is False
     assert engine.ping_delay_seconds() is None
     await engine.dispatch(command("pings", {"setting": "4"}))
+    await __import__("asyncio").sleep(0)
     assert engine._pings.count() == 4  # noqa: SLF001
     assert engine.ping_delay_seconds() is not None
 
@@ -177,9 +181,12 @@ async def test_pings_rejects_bad_values() -> None:
     engine, hub, pi = await _started()
     before = engine._pings.count()  # noqa: SLF001
     await engine.dispatch(command("pings", {"setting": "banana"}))
+    await __import__("asyncio").sleep(0)  # /pings defers; let the task run
     assert engine._pings.count() == before  # noqa: SLF001 — unchanged, usage shown
     hub.post_followup.assert_awaited_with(
-        "i1", "Usage: /pings <1-12>, /pings off, /pings status, or /pings window 8-22", ephemeral=True
+        "i1",
+        "Usage: /pings <1-12>, /pings off, /pings status, or /pings window 8-22",
+        ephemeral=True,
     )
 
 
@@ -187,6 +194,7 @@ async def test_strangers_cannot_change_pings() -> None:
     engine, hub, pi = await _started()
     before = engine._pings.count()  # noqa: SLF001
     await engine.dispatch(command("pings", {"setting": "9"}, user_id="999"))
+    await __import__("asyncio").sleep(0)  # /pings defers; let the task run
     assert engine._pings.count() == before  # noqa: SLF001
 
 
@@ -256,6 +264,7 @@ async def test_pi_end_directive_is_ignored_close_is_human_only(tmp_path) -> None
     assert not any("Lesson complete" in str(c.args[1]) for c in hub.post_message.await_args_list)
     # The human command still closes it.
     await engine.dispatch(command("lesson", {"action": "end", "value": "done"}))
+    await __import__("asyncio").sleep(0)  # /lesson defers; let the task run
     assert engine._lessons.thread_id is None  # noqa: SLF001
     assert not state_file.exists()
 
@@ -362,6 +371,7 @@ async def test_lesson_command_start_binds_thread(tmp_path) -> None:
     hub.create_thread.return_value = {"id": "888"}
     result = await engine.dispatch(command("lesson", {"action": "start", "value": "Races"}))
     assert result == {"defer": True, "ephemeral": False}
+    await __import__("asyncio").sleep(0)  # /lesson defers; let the task run
     hub.create_thread.assert_awaited_once_with(100, "Races")
     assert engine._lessons.thread_id == 888  # noqa: SLF001
     # Voice transcripts now land in the thread.
@@ -373,7 +383,9 @@ async def test_lesson_command_end_clears_binding(tmp_path) -> None:
     engine, hub, pi = make_engine(lesson_env(tmp_path))
     hub.create_thread.return_value = {"id": "888"}
     await engine.dispatch(command("lesson", {"action": "start", "value": "Races"}))
+    await __import__("asyncio").sleep(0)  # /lesson defers; let the task run
     await engine.dispatch(command("lesson", {"action": "end", "value": "known (explained)"}))
+    await __import__("asyncio").sleep(0)
     assert engine._lessons.thread_id is None  # noqa: SLF001
     posted = [c.args[1] for c in hub.post_message.await_args_list]
     assert any("Lesson complete: Races** — known (explained)" in t for t in posted)
@@ -382,6 +394,7 @@ async def test_lesson_command_end_clears_binding(tmp_path) -> None:
 async def test_lesson_command_start_requires_topic(tmp_path) -> None:
     engine, hub, pi = make_engine(lesson_env(tmp_path))
     await engine.dispatch(command("lesson", {"action": "start"}))
+    await __import__("asyncio").sleep(0)  # /lesson defers; let the task run
     hub.create_thread.assert_not_awaited()
     followup = hub.post_followup.await_args
     assert followup.kwargs.get("ephemeral") is True
@@ -390,6 +403,7 @@ async def test_lesson_command_start_requires_topic(tmp_path) -> None:
 async def test_lesson_command_status_reports(tmp_path) -> None:
     engine, hub, pi = make_engine(lesson_env(tmp_path))
     await engine.dispatch(command("lesson", {"action": "status"}))
+    await __import__("asyncio").sleep(0)  # /lesson defers; let the task run
     assert "No active lesson" in hub.post_followup.await_args.args[1]
 
 
@@ -424,6 +438,8 @@ async def test_lecture_writes_renders_and_posts_link(tmp_path) -> None:
     )
     result = await engine.dispatch(command("lecture", {"topic": "crash windows"}))
     assert result == {"defer": True, "ephemeral": False}
+    # /lecture defers, then its handler backgrounds the production: two yields.
+    await __import__("asyncio").sleep(0)
     await __import__("asyncio").sleep(0)
     # Pi got the writing prompt carrying the topic.
     first_prompt = pi.prompt.await_args_list[0].args[0]
@@ -453,6 +469,7 @@ async def test_lecture_without_directive_renders_nothing(tmp_path) -> None:
     engine._render_audio = AsyncMock()  # noqa: SLF001
     pi.prompt.return_value = pi_reply("I chatted but never wrote a file.")
     await engine.dispatch(command("lecture", {"topic": "state machines"}))
+    await __import__("asyncio").sleep(0)  # defer task, then production task
     await __import__("asyncio").sleep(0)
     engine._render_audio.assert_not_awaited()  # noqa: SLF001
     posted = [c.args[1] for c in hub.post_message.await_args_list]
@@ -466,6 +483,7 @@ async def test_lecture_rejects_paths_outside_lessons(tmp_path) -> None:
     engine._render_audio = AsyncMock()  # noqa: SLF001
     pi.prompt.return_value = pi_reply("Oops.\n[lecture-file: ../secret.md]")
     await engine.dispatch(command("lecture", {"topic": "x"}))
+    await __import__("asyncio").sleep(0)  # defer task, then production task
     await __import__("asyncio").sleep(0)
     engine._render_audio.assert_not_awaited()  # noqa: SLF001
     posted = [c.args[1] for c in hub.post_message.await_args_list]
@@ -475,6 +493,7 @@ async def test_lecture_rejects_paths_outside_lessons(tmp_path) -> None:
 async def test_lecture_requires_a_topic(tmp_path) -> None:
     engine, hub, pi = make_engine(lecture_env(tmp_path))
     await engine.dispatch(command("lecture", {"topic": "  "}))
+    await __import__("asyncio").sleep(0)  # /lecture defers; let the task run
     pi.prompt.assert_not_awaited()
     assert hub.post_followup.await_args.kwargs.get("ephemeral") is True
 

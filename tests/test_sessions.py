@@ -212,6 +212,7 @@ async def test_lesson_start_claims_clean_session_without_closing(tmp_path) -> No
     await engine.dispatch(message("Alvar, hi"))  # 1 turn on the main session
     hub.create_thread.return_value = {"id": "555"}
     await engine.dispatch(command("lesson", {"action": "start", "value": "Races"}))
+    await __import__("asyncio").sleep(0)  # /lesson defers; let the task run
     # Dirty session (1 turn) was auto-closed and the fresh one belongs to
     # the lesson.
     pi.new_session.assert_awaited_once()
@@ -227,6 +228,7 @@ async def test_lesson_start_on_fresh_session_just_retypes(tmp_path) -> None:
     engine._current = engine._sessions.create(session_file="s0", owner=MAIN_OWNER)  # noqa: SLF001
     hub.create_thread.return_value = {"id": "555"}
     await engine.dispatch(command("lesson", {"action": "start", "value": "Races"}))
+    await __import__("asyncio").sleep(0)  # /lesson defers; let the task run
     pi.new_session.assert_not_awaited()
     assert engine._current.owner == lesson_owner(555)  # noqa: SLF001
 
@@ -236,8 +238,10 @@ async def test_lesson_end_completes_its_session_forever(tmp_path) -> None:
     await engine.start()
     hub.create_thread.return_value = {"id": "555"}
     await engine.dispatch(command("lesson", {"action": "start", "value": "Races"}))
+    await __import__("asyncio").sleep(0)  # /lesson defers; let the task run
     await engine.dispatch(message("working on it", thread={"id": "555", "name": "Races"}))
     await engine.dispatch(command("lesson", {"action": "end", "value": "done"}))
+    await __import__("asyncio").sleep(0)
     records = engine._sessions.all()  # noqa: SLF001
     lesson_session = next(r for r in records if r.owner == lesson_owner(555))
     assert lesson_session.state == COMPLETE
@@ -290,9 +294,11 @@ async def test_lesson_end_checkpoints_before_freezing(tmp_path) -> None:
     await engine.start()
     hub.create_thread.return_value = {"id": "555"}
     await engine.dispatch(command("lesson", {"action": "start", "value": "Races"}))
+    await __import__("asyncio").sleep(0)  # /lesson defers; let the task run
     await engine.dispatch(message("working on it", thread={"id": "555", "name": "Races"}))
     pi.prompt.reset_mock()
     await engine.dispatch(command("lesson", {"action": "end", "value": "done"}))
+    await __import__("asyncio").sleep(0)
     close_prompts = [
         c.args[0] for c in pi.prompt.await_args_list if "closing checklist" in c.args[0]
     ]

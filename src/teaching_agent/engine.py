@@ -610,14 +610,20 @@ class TeachingEngine:
             # in the background, like the prompt-driven commands below.
             asyncio.create_task(self._run_mode(payload))
             return True
+        # /lesson, /pings and /lecture answer via post_followup, which costs
+        # a hub->Discord API roundtrip INSIDE the hub's 2.5s callback budget
+        # (ADR 0003). Run them backgrounded like /mode and /voice: answer
+        # defer fast, work in the background. Awaiting them inline showed up
+        # live as the hub timing out and posting its "project unreachable"
+        # ephemeral NEXT TO the real followup (2026-10-23, /pings status).
         if command == "lesson":
-            await self._handle_lesson(payload)
+            asyncio.create_task(self._run_lesson(payload))
             return True
         if command == "pings":
-            await self._handle_pings(payload)
+            asyncio.create_task(self._run_pings(payload))
             return True
         if command == "lecture":
-            await self._handle_lecture(payload)
+            asyncio.create_task(self._run_lecture(payload))
             return True
         if command == "voice":
             # Backgrounded like /mode: joining voice (WS connect + STT
@@ -663,6 +669,24 @@ class TeachingEngine:
             await self._handle_voice_command(payload)
         except Exception:
             logger.exception("/voice handling failed.")
+
+    async def _run_lesson(self, payload: dict[str, Any]) -> None:
+        try:
+            await self._handle_lesson(payload)
+        except Exception:
+            logger.exception("/lesson handling failed.")
+
+    async def _run_pings(self, payload: dict[str, Any]) -> None:
+        try:
+            await self._handle_pings(payload)
+        except Exception:
+            logger.exception("/pings handling failed.")
+
+    async def _run_lecture(self, payload: dict[str, Any]) -> None:
+        try:
+            await self._handle_lecture(payload)
+        except Exception:
+            logger.exception("/lecture handling failed.")
 
     async def _handle_mode(self, payload: dict[str, Any]) -> None:
         """Flip test mode live: rebuild pi's system prompt and restart the
