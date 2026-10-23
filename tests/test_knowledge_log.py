@@ -7,8 +7,9 @@ Black-box, behavior-level: these tests drive the CLI boundary
 (scripts/kb_append.py, scripts/kb_derive.py, scripts/kb_migrate.py) as
 subprocesses against a temp kb/ directory — never internals.
 
-NOTHING IS IMPLEMENTED YET. Every test here is expected to fail until
-session #6 lands the build; they are committed xfail so CI stays green.
+Built in session #6 (2026-10-23): the four tests below were committed xfail
+in session #5 and flipped green by scripts/kb_append.py, scripts/kb_derive.py,
+and scripts/kb_migrate.py.
 See docs/proposals/knowledge-storage.md, "Adopted design (2026-10-21)".
 """
 
@@ -19,16 +20,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 REPO = Path(__file__).resolve().parent.parent
 APPEND = REPO / "scripts" / "kb_append.py"
 DERIVE = REPO / "scripts" / "kb_derive.py"
 MIGRATE = REPO / "scripts" / "kb_migrate.py"
-
-XFAIL_REASON = "knowledge log not built yet (design approved 2026-10-21; build is session #6)"
-pytestmark = pytest.mark.xfail(reason=XFAIL_REASON, strict=False)
-
 
 def run_cli(script: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
