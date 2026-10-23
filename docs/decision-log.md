@@ -702,3 +702,5 @@ Intervention: Un-shelved docs/proposals/knowledge-storage.md in a dedicated desi
 Evidence (the two needs, per the meta-rule): (1) commit friction — the agent's write path went through git, a human-paced ceremony, ~10x/day (the 2026-10-16 "dubious ownership" fix fixed the symptom, not the cause); (2) routing done by re-reading prose — current-state.md's hand-rolled "Prior: ... Prior: ..." chain is an event log packed into one mutable file, re-read by the LLM every session to work out what's owed and what faded: expensive, lossy, and a growing cost driver (see the 2026-10-19 session-cost discussion in current-state).
 
 Verdict: keep — design approved by the learner 2026-10-21. Gate to implementation: learner approves the xfail tests.
+
+OUTCOME (same day): learner reviewed and approved all 4 xfail tests as the behavioral contract (append-only enforced; derived view regenerates identically; never upgrade past evidence; migration round-trips with flags-not-guesses). Gate SATISFIED — session #6 (knowledge log — build) is unblocked; build targets: scripts/kb_append.py, scripts/kb_derive.py, scripts/kb_migrate.py + nightly git-snapshot cron outside pi's write path.
