@@ -1,10 +1,12 @@
-# Session: knowledge log — design + tests (no src changes)
+# Session: knowledge log — design + tests (no src changes) — ✅ DONE 2026-10-21
 
 **Suggested session name:** `teaching-agent: knowledge log — design + tests`
 
-Roadmap: `Automations/ops/session-prompts/README.md` (#5).
+Roadmap: `Automations/ops/session-prompts/README.md` (#5 — ticked 2026-10-21).
 
 Copy everything below the line into the new session.
+
+**COMPLETED 2026-10-21.** Proposal approved (status flipped in `docs/proposals/knowledge-storage.md`), decision logged (`docs/decision-log.md` "2026-10-21 — Knowledge-storage design APPROVED"), and all 4 behavioral tests approved by the learner, committed xfail in `tests/test_knowledge_log.py` (111 passed / 4 xfailed). #6's gate ("after #5's tests are approved") is now satisfied. Outcome details at the bottom of this file. The text below the line is preserved as-run.
 
 ---
 
@@ -66,3 +68,54 @@ including both 2026-10-16 addenda.** This session exists because of it),
    now (nothing is implemented). Commit them marked xfail/skipped so
    CI stays green.
 3. STOP. The build is session #6, after the learner approves the tests.
+
+---
+
+# Outcome — 2026-10-21 — SUCCESS (design approved, 4 tests approved by the learner, committed xfail; no src changes). Instructions above untouched.
+
+## What happened
+
+1. **Pulled, then read the required docs in order** (AGENTS.md, the full
+   proposal incl. both addenda, thesis, routing, current-state top + Prior:
+   chain, decision-log, maps/software-development.md).
+2. **Resolved the five open questions WITH the learner** (one at a time,
+   learner picked each):
+   - Q1 framing → **confirmed**: record = evidence; prediction = one derived use.
+   - Q2 credit assignment → **one event per node touched** with per-node
+     outcome; coached/unaided is the credit-assignment data.
+   - Q3 storage → **JSONL in /kb; git leaves the agent's write path**
+     (nightly cron snapshot + nightly backup).
+   - Q4 write path → **CLI tool the agent calls** (`scripts/kb_append.py` is
+     the only write path; the log IS a write boundary).
+   - Q5 migration → **script + human review pass**; lossy spots flagged, not
+     guessed.
+   - Q6 meta-rule → adoption logged in `docs/decision-log.md` with the two
+     needs (commit friction; routing by re-reading prose).
+3. **Deliverable 1 — design written in**: `docs/proposals/knowledge-storage.md`
+   status flipped SHELVED → **APPROVED 2026-10-21**, with an "Adopted design"
+   addendum (data model: append-only hash-chained `kb/events.jsonl` +
+   `kb/nodes.jsonl`; event types evidence/node_created/node_split/node_merge/
+   claim_asserted/claim_rechecked/routing_override; project vocabulary kept —
+   `presented|recognized|recalled|explained|applied|transferred`, delay as a
+   separate field; stability/retrievability = internal derived machinery only;
+   four invariants). Decision-log entry appended.
+4. **Deliverable 2 — tests written WITH the learner's decisions encoded**:
+   `tests/test_knowledge_log.py`, 4 black-box subprocess-CLI tests (append-only
+   enforced via hash-chain tamper refusal; derived current-state regenerates
+   byte-identically; level never upgraded past evidence incl. coached ≠
+   unaided and delay required for retention; migrated Prior:-chain sample
+   round-trips with gibberish flagged `unverified`). They FAIL now and are
+   committed `xfail(strict=False)` — verified: **111 passed, 4 xfailed**,
+   ruff clean.
+5. **No src touched.** Stopped before the build (that's session #6, gated on
+   the learner approving the xfail tests).
+6. **Session discipline**: `docs/current-state.md` top entry written;
+   committed as `06ca176`.
+
+## For the next session (#6, the build)
+
+- Gate first: learner approves `tests/test_knowledge_log.py`.
+- Then build `scripts/kb_append.py`, `scripts/kb_derive.py`,
+  `scripts/kb_migrate.py` until the 4 xfails flip to passes (remove the
+  xfail marks), plus the nightly git-snapshot cron (outside pi's write path).
+- Uncommitted pre-existing files (`sessions/NEXT-BOOT*.md`) were left alone.

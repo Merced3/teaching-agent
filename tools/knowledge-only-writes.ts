@@ -6,8 +6,11 @@
  * that runs it (src/, tests/, tools/, pyproject, .env, ...). Prompt rules
  * leak (decision log 2026-10-02), so this extension makes the boundary
  * physical: every write/edit tool call is path-checked, and bash is
- * reduced to a read-only + git allowlist (bash can otherwise write any
- * path; git is needed for the session-close commit).
+ * reduced to a read-only + git allowlist PLUS the knowledge-log CLIs
+ * (scripts/kb_append.py, scripts/kb_derive.py — the ONLY write path for
+ * kb/events.jsonl, per the knowledge-log design approved 2026-10-21).
+ * kb/ itself stays outside WRITABLE_DIRS on purpose: the log is a write
+ * boundary, so the agent appends through the CLI, never by editing files.
  *
  * This guards against ACCIDENTS (model writes code mid-lesson), not a
  * determined adversary — the model is a teacher, not an attacker.
@@ -20,8 +23,15 @@ import path from "node:path";
 const WRITABLE_DIRS = ["docs", "maps", "sessions", "lessons", "assets", "out", "data"];
 const WRITABLE_FILES = ["AGENTS.md", "README.md"];
 
-/** bash is kept only for git commits and read-only inspection. */
+/** bash is kept for read-only inspection and git (snapshot cron commits). */
 const BASH_ALLOW = /^\s*(git|date|ls|grep|rg|find|cat|head|tail|wc|pwd|echo|sed\s+-n)\b/;
+
+/**
+ * The knowledge-log CLIs are the ONLY write path for the event log (the log
+ * is a write boundary: schema + hash chain enforced on every write). Only
+ * these two script invocations may run under python — nothing else.
+ */
+const KB_CLI = /^\s*(python3?|py)(\.exe)?\s+scripts[\/\\]kb_(append|derive)\.py\b/;
 
 export default function (pi: ExtensionAPI) {
   pi.on("tool_call", async (event) => {
@@ -59,12 +69,14 @@ export default function (pi: ExtensionAPI) {
             "Use the write/edit tools for knowledge-base files.",
         };
       }
-      if (!BASH_ALLOW.test(command)) {
+      if (!BASH_ALLOW.test(command) && !KB_CLI.test(command)) {
         return {
           block: true,
           reason:
             "The teacher's shell is read-only + git (git, date, ls, grep, rg, find, cat, " +
-            "head, tail, wc, pwd, echo). Its job is to teach, not build.",
+            "head, tail, wc, pwd, echo) plus the knowledge-log CLIs " +
+            "(python scripts/kb_append.py, python scripts/kb_derive.py — the ONLY way " +
+            "evidence is written). Its job is to teach, not build.",
         };
       }
     }
