@@ -1,4 +1,4 @@
-# Session: knowledge log — build — 🔨 BUILD DONE 2026-10-23 (PR #1 open, cutover + live-verify pending)
+# Session: knowledge log — build — ✅ DONE 2026-10-23 (merged, deployed, live-verified: real close + real ping through the event log; roadmap #6 ticked)
 
 **Suggested session name:** `teaching-agent: knowledge log — build`
 
@@ -16,10 +16,14 @@ real Prior-chain migration run — 3 confident events + 40 flags in
 `kb/events.jsonl` awaiting learner review; cutover DONE with explicit learner
 approval (AGENTS.md + session-handoff.md wording, current-state.md now the
 GENERATED view, prose archived in docs/archive/); decision-log entry written.
-Still owed: review of the 40 flags, nightly git-snapshot cron in ops, then
-merge → deploy → watch one real ping + one real `/close` through the event log,
-then tick #6. Outcome details at the bottom of this file. The text below the
-line is preserved as-run.
+MERGED + DEPLOYED + LIVE-VERIFIED 2026-10-23: PR #1 (squash `0a13f6d`) + cutover-fix
+PR #5 (squash `9c4a97f`) merged; nightly `kb-snapshot.sh` cron installed (03:20,
+kb-push ships it); real `/close` recorded events 44–50 and a real answered ping
+recorded event 51 (`sd/reconciliation-job`, recalled unaided, 4 days) through
+`kb_append.py` on the droplet; `current-state.md` is GENERATED. Roadmap #6
+TICKED. Still owed (follow-ups, not gates): learner review of the 40 migration
+flags. Outcome details at the bottom of this file. The text below the line is
+preserved as-run.
 
 ---
 
@@ -89,12 +93,19 @@ roadmap.
    now `presented` events); prose current-state archived untouched at
    `docs/archive/current-state-2026-10-23.md`; `docs/current-state.md` is now
    GENERATED. 115 passed, ruff clean.
-5. **Step 4 (merge/deploy/watch) — NOT done.** PR #1 open; learner merges;
-   deploy is automatic on merge; one real ping + one real `/close` through the
-   event log on the droplet still owed. Nightly git-snapshot cron (outside pi's
-   write path) is an ops-repo task, also owed.
+5. **Step 4 (merge/deploy/watch) — DONE 2026-10-23.** PR #1 merged (squash
+   `0a13f6d`); droplet OOMed during build (1 GB warning), power-cycled, recovered;
+   live-agent uncommitted state snapshotted + merged with zero loss. First live
+   `/close` exposed stale engine prompts + extension blocking the kb CLIs →
+   cutover-fix PR #5 (squash `9c4a97f`). Nightly `kb-snapshot.sh` cron installed
+   (03:20; `kb-push.sh` ships it). SECOND live `/close`: events 44–50 appended
+   via `kb_append.py`, view regenerated, no git ceremony. Live answered ping:
+   event 51 (`sd/reconciliation-job`, recalled unaided, delay 4d). SUCCESS BAR MET.
 6. **Step 5 (decision log) — DONE.** `docs/decision-log.md` "2026-10-23 —
    Knowledge log BUILT", verdict PENDING learner.
-7. **Roadmap #6 NOT ticked** — success bar includes the live ping+close on the
-   droplet; tick after merge + live verification.
-8. Pre-existing uncommitted files (`sessions/NEXT-BOOT*.md`) left alone.
+7. **Roadmap #6 TICKED 2026-10-23** — full success bar met (tests green, history
+   migrated with zero silent loss, real close + real ping through the event log,
+   agent no longer hand-edits current-state).
+8. Pre-existing uncommitted files (`sessions/NEXT-BOOT*.md`) resolved: droplet is
+   the live KB (cron commits nightly); the local duplicate NEXT-BOOT copy was
+   verified identical (CRLF/LF only) and deleted — do not commit such residue.
