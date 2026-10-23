@@ -93,6 +93,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--kb", required=True, type=Path, help="knowledge base directory")
     parser.add_argument("view", choices=["grades", "current-state"])
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="also write the view to this path (the generated-docs path; the "
+        "teacher's shell blocks redirection, so the file write lives here)",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -108,6 +115,8 @@ def main(argv: list[str] | None = None) -> int:
         derived = args.kb / "derived"
         derived.mkdir(parents=True, exist_ok=True)
         (derived / "current-state.md").write_text(view, encoding="utf-8")
+        if args.out is not None:
+            args.out.write_text(view, encoding="utf-8")
         print(view)
     return 0
 

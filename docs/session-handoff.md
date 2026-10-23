@@ -40,9 +40,10 @@ Today's goal: <one sentence>
 
 1. Record evidence as **events**, one per node touched, through the ONLY write path:
    `python scripts/kb_append.py --kb kb append --event '{"type":"evidence","ts":"<ISO>","node":"<id>","level":"<level>","delay_days":<n>,"coached":<bool>,"channel":"<channel>","session":"sessions/<file>.md","notes":"<what was demonstrated, unaided vs coached>"}'`.
-   Then regenerate the view: `python scripts/kb_derive.py --kb kb current-state > docs/current-state.md`
-   (GENERATED — never hand-edit). Also note which model(s) were used in the session log
-   (files must not mislabel the model).
+   Then regenerate the view: `python scripts/kb_derive.py --kb kb current-state --out docs/current-state.md`
+   (GENERATED — never hand-edit; your shell blocks redirection, so the `--out` flag does the file write).
+   Also note which model(s) were used in the session log (files must not mislabel the model).
+   Do NOT commit to git — the nightly snapshot cron handles history.
 2. Update `docs/learner.md` if anything true was learned about this mind — with status (`confirmed` / `observed` / `hypothesis`) and evidence.
 3. Append any experiments or approach changes to `docs/decision-log.md`.
 4. If any taught claim is time-sensitive, note its `current as of` date.
