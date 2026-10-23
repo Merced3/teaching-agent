@@ -7,6 +7,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from teaching_agent.pings import PingController
 
 DAY = datetime(2026, 10, 10).date()
@@ -109,3 +111,25 @@ def test_describe_reports_count_and_off(tmp_path: Path) -> None:
     ctl.set_count(4)
     text = ctl.describe(now=datetime(2026, 10, 10, 7, 0))
     assert "4/day" in text
+
+
+def test_set_window_persists_and_redraws(tmp_path: Path) -> None:
+    ctl = make_controller(tmp_path, window_start_hour=8, window_end_hour=22)
+    before = ctl.slots_for(DAY, 3)
+    ctl.set_window(10, 12)
+    assert ctl.window() == (10, 12)
+    # Persisted: a fresh instance (simulated restart) sees the new window.
+    ctl2 = make_controller(tmp_path, window_start_hour=8, window_end_hour=22)
+    assert ctl2.window() == (10, 12)
+    after = ctl2.slots_for(DAY, 3)
+    assert after != before
+    assert all(10 <= s.hour < 12 for s in after)
+
+
+def test_set_window_rejects_invalid(tmp_path: Path) -> None:
+    ctl = make_controller(tmp_path)
+    for bad in [(22, 8), (8, 8), (-1, 12), (8, 25)]:
+        with pytest.raises(ValueError):
+            ctl.set_window(*bad)
+    # Window untouched after the rejects.
+    assert ctl.window() == (8, 22)

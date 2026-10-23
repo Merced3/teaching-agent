@@ -15,9 +15,10 @@ from __future__ import annotations
 import json
 import logging
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,9 @@ _MAX_ATTEMPTS = 2_000
 class _State:
     pings_per_day: int
     last_fired: datetime | None
+    # None = fall back to the constructor (env) hours, like the count does.
+    window_start_hour: int | None = None
+    window_end_hour: int | None = None
 
 
 class PingController:
@@ -39,16 +43,32 @@ class PingController:
         state_file: Path,
         *,
         window_start_hour: int = 8,
-        window_end_hour: int = 23,
+        window_end_hour: int = 22,
         default_count: int = 3,
+        timezone_name: str = "America/Chicago",
     ) -> None:
         if not 0 <= window_start_hour < window_end_hour <= 24:
             raise ValueError("ping window must satisfy 0 <= start < end <= 24")
         self._state_file = state_file
-        self._window_start = time(window_start_hour)
-        self._window_end = time(window_end_hour, 0) if window_end_hour < 24 else time(23, 59, 59)
-        self._end_exclusive = window_end_hour == 24
+        # Constructor hours are boot defaults only; /pings window overrides
+        # them live via the state file (same pattern as the count).
+        self._env_start_hour = window_start_hour
+        self._env_end_hour = window_end_hour
         self._default_count = default_count
+        # The window and "now" live in the LEARNER's timezone, not the
+        # server's — the VPS runs on UTC, which would shift the waking
+        # window by 5–6 hours (decision-log 2026-10-09, tz fix).
+        self._tz = ZoneInfo(timezone_name)
+
+    def _now(self) -> datetime:
+        """Current time in the learner's timezone, naive.
+
+        Everything in this module (slots, last_fired) is naive local time,
+        so the schedule is defined by wall-clock in ``self._tz`` regardless
+        of the host's clock. Naive-on-purpose: mixing aware and naive
+        datetimes would break every comparison here.
+        """
+        return datetime.now(self._tz).replace(tzinfo=None)
 
     # -- state ----------------------------------------------------------
 
@@ -63,12 +83,19 @@ class PingController:
             last_fired = datetime.fromisoformat(last) if last else None
         except (TypeError, ValueError):
             last_fired = None
-        return _State(pings_per_day=max(0, int(count)), last_fired=last_fired)
+        return _State(
+            pings_per_day=max(0, int(count)),
+            last_fired=last_fired,
+            window_start_hour=raw.get("window_start_hour"),
+            window_end_hour=raw.get("window_end_hour"),
+        )
 
     def _save(self, state: _State) -> None:
         self._state_file.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "pings_per_day": state.pings_per_day,
+            "window_start_hour": state.window_start_hour,
+            "window_end_hour": state.window_end_hour,
             "last_fired": state.last_fired.isoformat() if state.last_fired else None,
         }
         tmp = self._state_file.with_suffix(self._state_file.suffix + ".tmp")
@@ -83,7 +110,33 @@ class PingController:
         if count < 0:
             raise ValueError("pings per day must be >= 0")
         state = self._load()
-        self._save(_State(pings_per_day=count, last_fired=state.last_fired))
+        self._save(replace(state, pings_per_day=count))
+
+    # -- window -----------------------------------------------------------
+
+    def _window(self) -> tuple[time, time]:
+        """The live waking window (state file wins over env defaults)."""
+        state = self._load()
+        start_hour = state.window_start_hour
+        end_hour = state.window_end_hour
+        if start_hour is None or end_hour is None or not 0 <= start_hour < end_hour <= 24:
+            start_hour, end_hour = self._env_start_hour, self._env_end_hour
+        start = time(start_hour)
+        end = time(end_hour, 0) if end_hour < 24 else time(23, 59, 59)
+        return start, end
+
+    def window(self) -> tuple[int, int]:
+        """The live window as (start_hour, end_hour), for display."""
+        start, end = self._window()
+        return start.hour, end.hour
+
+    def set_window(self, start_hour: int, end_hour: int) -> None:
+        """Live-retune the waking window; redraws today's remaining slots
+        (same accepted reshuffle semantics as a count change)."""
+        if not 0 <= start_hour < end_hour <= 24:
+            raise ValueError("ping window must satisfy 0 <= start < end <= 24")
+        state = self._load()
+        self._save(replace(state, window_start_hour=start_hour, window_end_hour=end_hour))
 
     # -- schedule ---------------------------------------------------------
 
@@ -95,9 +148,10 @@ class PingController:
         n = self.count() if count is None else count
         if n <= 0:
             return []
-        rng = random.Random(f"{day.isoformat()}|{n}|{self._window_start}|{self._window_end}")
-        start = datetime.combine(day, self._window_start)
-        end = datetime.combine(day, self._window_end)
+        window_start, window_end = self._window()
+        rng = random.Random(f"{day.isoformat()}|{n}|{window_start}|{window_end}")
+        start = datetime.combine(day, window_start)
+        end = datetime.combine(day, window_end)
         span = (end - start).total_seconds()
         if span <= 0:
             return []
@@ -117,7 +171,7 @@ class PingController:
     def due(self, now: datetime | None = None) -> bool:
         """A slot has passed and not been fired. Missed slots collapse to ONE
         catch-up ping (the latest), not a backlog of nags."""
-        now = now or datetime.now()
+        now = now or self._now()
         state = self._load()
         if state.pings_per_day <= 0:
             return False
@@ -128,11 +182,11 @@ class PingController:
 
     def mark_fired(self, when: datetime | None = None) -> None:
         state = self._load()
-        self._save(_State(pings_per_day=state.pings_per_day, last_fired=when or datetime.now()))
+        self._save(_State(pings_per_day=state.pings_per_day, last_fired=when or self._now()))
 
     def next_fire(self, now: datetime | None = None) -> datetime | None:
         """Next slot to wait for; None when pings are off."""
-        now = now or datetime.now()
+        now = now or self._now()
         count = self.count()
         if count <= 0:
             return None
@@ -143,11 +197,15 @@ class PingController:
         return tomorrow[0] if tomorrow else None
 
     def describe(self, now: datetime | None = None) -> str:
-        now = now or datetime.now()
+        now = now or self._now()
         count = self.count()
         if count <= 0:
             return "Pings are OFF (/pings <n> to resume, e.g. /pings 3)."
         remaining = [s for s in self.slots_for(now.date(), count) if s > now]
         times = ", ".join(s.strftime("%H:%M") for s in remaining) or "none left today"
-        window = f"{self._window_start:%H:%M}\u2013{self._window_end:%H:%M}"
-        return f"Pings: {count}/day, window {window}. Remaining today: {times}."
+        window_start, window_end = self._window()
+        window = f"{window_start:%H:%M}\u2013{window_end:%H:%M}"
+        return (
+            f"Pings: {count}/day, window {window} {self._tz.key}. "
+            f"Remaining today: {times}."
+        )

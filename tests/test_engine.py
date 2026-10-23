@@ -179,7 +179,7 @@ async def test_pings_rejects_bad_values() -> None:
     await engine.dispatch(command("pings", {"setting": "banana"}))
     assert engine._pings.count() == before  # noqa: SLF001 — unchanged, usage shown
     hub.post_followup.assert_awaited_with(
-        "i1", "Usage: /pings <1-12>, /pings off, or /pings status", ephemeral=True
+        "i1", "Usage: /pings <1-12>, /pings off, /pings status, or /pings window 8-22", ephemeral=True
     )
 
 

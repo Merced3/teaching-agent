@@ -49,6 +49,7 @@ class Settings:
     pings_per_day: int
     pings_window_start_hour: int
     pings_window_end_hour: int
+    pings_timezone: str
     pings_state_file: Path
     lecture_public_url: str
     lecture_tts: str
@@ -155,8 +156,13 @@ class Settings:
             environment, "TEACHING_AGENT_PINGS_WINDOW_START_HOUR", default=8
         )
         pings_window_end_hour = _positive_int_with_default(
-            environment, "TEACHING_AGENT_PINGS_WINDOW_END_HOUR", default=23
+            environment, "TEACHING_AGENT_PINGS_WINDOW_END_HOUR", default=22
         )
+        # Waking window is in the LEARNER's timezone (San Antonio), not the
+        # server's — the droplet runs on UTC.
+        pings_timezone = environment.get(
+            "TEACHING_AGENT_PINGS_TIMEZONE", "America/Chicago"
+        ).strip() or "America/Chicago"
         if not 0 <= pings_window_start_hour < pings_window_end_hour <= 24:
             raise ConfigurationError(
                 "Ping window must satisfy 0 <= START < END <= 24 "
@@ -278,6 +284,7 @@ class Settings:
             pings_per_day=pings_per_day,
             pings_window_start_hour=pings_window_start_hour,
             pings_window_end_hour=pings_window_end_hour,
+            pings_timezone=pings_timezone,
             pings_state_file=pings_state_file,
             lecture_public_url=lecture_public_url,
             lecture_tts=lecture_tts,

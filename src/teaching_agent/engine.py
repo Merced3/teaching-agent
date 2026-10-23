@@ -106,11 +106,11 @@ _COMMANDS = [
         # The count is learner-tunable live (data/pings.json), env is only
         # the boot default (decision-log 2026-10-09 pings redesign).
         "name": "pings",
-        "description": "Unprompted pings per day: /pings 3, /pings off, /pings status.",
+        "description": "Pings: /pings 3, /pings off, /pings status, /pings window 8-22.",
         "options": [
             {
                 "name": "setting",
-                "description": "a number (e.g. 3), off, or status",
+                "description": "a number, off, status, or window <start>-<end> (24h)",
                 "type": "string",
                 "required": True,
             }
@@ -374,6 +374,7 @@ class TeachingEngine:
             window_start_hour=settings.pings_window_start_hour,
             window_end_hour=settings.pings_window_end_hour,
             default_count=settings.pings_per_day,
+            timezone_name=settings.pings_timezone,
         )
 
     async def stop(self) -> None:
@@ -989,6 +990,34 @@ class TeachingEngine:
         if setting == "status":
             await self._hub.post_followup(interaction_id, self._pings.describe(), ephemeral=False)
             return
+        if setting.startswith("window"):
+            match = re.fullmatch(r"window\s+(\d{1,2})\s*-\s*(\d{1,2})", setting)
+            if not match:
+                await self._hub.post_followup(
+                    interaction_id,
+                    "Usage: /pings window <start>-<end> in 24h, e.g. /pings window 8-22 "
+                    "(8AM\u201310PM San Antonio time).",
+                    ephemeral=True,
+                )
+                return
+            start_hour, end_hour = int(match.group(1)), int(match.group(2))
+            try:
+                self._pings.set_window(start_hour, end_hour)
+            except ValueError:
+                await self._hub.post_followup(
+                    interaction_id,
+                    "Window must satisfy 0 <= start < end <= 24 "
+                    f"(got {start_hour}\u2013{end_hour}).",
+                    ephemeral=True,
+                )
+                return
+            await self._hub.post_followup(
+                interaction_id,
+                f"Window set to {start_hour:02d}:00\u2013{end_hour % 24:02d}:00 San Antonio time. "
+                + self._pings.describe(),
+                ephemeral=False,
+            )
+            return
         if setting in {"off", "0"}:
             self._pings.set_count(0)
             await self._hub.post_followup(
@@ -1004,7 +1033,7 @@ class TeachingEngine:
         if not 1 <= count <= 12:
             await self._hub.post_followup(
                 interaction_id,
-                "Usage: /pings <1-12>, /pings off, or /pings status",
+                "Usage: /pings <1-12>, /pings off, /pings status, or /pings window 8-22",
                 ephemeral=True,
             )
             return
