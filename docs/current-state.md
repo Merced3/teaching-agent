@@ -6,26 +6,50 @@
 
 ## Node grades
 
+### sd/atomicity
+> Can identify which writes belong in one atomic unit (all-or-nothing, rollback) and place the boundary relative to the point of no return.
+- level: explained (unaided); unaided: explained; retention win; events: 8; last: 2026-10-21T00:00:00Z
+
+### sd/backoff
+> Can explain multiplicative wait between retries and why it protects a recovering dependency.
+- level: transferred (unaided); unaided: transferred; retention win; events: 6; last: 2026-10-20T00:00:00Z
+
 ### sd/crash-window
-- level: recalled (coached); unaided: none; no delayed evidence; events: 1; last: 2026-10-23T00:00:00Z
+> Can locate the crash window - the gap between two durable steps where a crash forces a duplication-vs-loss choice - and pick the acceptable failure mode.
+- level: applied (unaided); unaided: applied; retention win; events: 8; last: 2026-10-23T00:00:00Z
 
 ### sd/idempotency
-- level: recalled (coached); unaided: none; no delayed evidence; events: 1; last: 2026-10-23T00:00:00Z
+> Can distinguish idempotency (same effect regardless of run count) from retry-safety (caller may retry blindly and still learn the result).
+- level: explained (coached); unaided: explained; no delayed evidence; events: 10; last: 2026-10-24T00:00:00Z
 
 ### sd/invariant
-- level: recalled (unaided); unaided: recalled; retention win; events: 1; last: 2026-10-23T00:00:00Z
+> Can state the rule a system's state must always satisfy, distinct from the mechanisms (atomicity, guarded writes) that guard it.
+- level: recalled (unaided); unaided: recalled; retention win; events: 8; last: 2026-10-23T00:00:00Z
+
+### sd/jitter
+> Can explain how randomizing retry timing breaks lockstep so a retrying crowd does not arrive in waves.
+- level: explained (coached); unaided: recalled; retention win; events: 6; last: 2026-10-24T00:00:00Z
 
 ### sd/keyed-receipt
-- level: explained (unaided); unaided: explained; retention win; events: 3; last: 2026-10-23T00:00:00Z
+> Can design a retry-safe operation: receipt written before the send, retry reads the receipt and returns the recorded result instead of re-executing.
+- level: transferred (unaided); unaided: transferred; retention win; events: 24; last: 2026-10-23T00:00:00Z
 
 ### sd/reconciliation-job
-- level: recalled (unaided); unaided: recalled; retention win; events: 2; last: 2026-10-23T00:00:00Z
+> Can design a bounded background job that resolves unknown outcomes via provider query by request ID, escalating to a human when pending too long.
+- level: applied (unaided); unaided: applied; no delayed evidence; events: 11; last: 2026-10-23T00:00:00Z
 
 ### sd/state-machine
-- level: recognized (coached); unaided: none; no delayed evidence; events: 1; last: 2026-10-23T00:00:00Z
+> Can model a lifecycle as named states + allowed transitions, using a middle state (e.g. CLOSING) as a witness to where a crash happened.
+- level: explained (unaided); unaided: explained; retention win; events: 8; last: 2026-10-23T00:00:00Z
+
+### sd/thundering-herd
+> Can recognize that a mass of simultaneous valid retries can re-crash a recovering provider.
+- level: explained (unaided); unaided: explained; no delayed evidence; events: 2; last: 2026-10-24T00:00:00Z
 
 ### sd/timeout-unknown-state
-- level: recalled (unaided); unaided: recalled; retention win; events: 1; last: 2026-10-23T00:00:00Z
+> After an outside call times out, can enumerate executed/pending/failed, refuse blind retry, and reset to a known state (stay PENDING + provider query).
+- level: applied (unaided); unaided: applied; retention win; events: 8; last: 2026-10-23T00:00:00Z
 
 ### sd/write-boundary
-- level: recalled (unaided); unaided: recalled; retention win; events: 1; last: 2026-10-23T00:00:00Z
+> Can identify the perimeter of state-changing code paths and knows invariants must be enforced on every write path.
+- level: recalled (unaided); unaided: recalled; retention win; events: 7; last: 2026-10-23T00:00:00Z
