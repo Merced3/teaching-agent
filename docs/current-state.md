@@ -12,7 +12,7 @@
 
 ### sd/backoff
 > Can explain multiplicative wait between retries and why it protects a recovering dependency.
-- level: transferred (unaided); unaided: transferred; retention win; events: 6; last: 2026-10-20T00:00:00Z
+- level: transferred (unaided); unaided: transferred; retention win; events: 7; last: 2026-10-25T00:00:00Z
 
 ### sd/crash-window
 > Can locate the crash window - the gap between two durable steps where a crash forces a duplication-vs-loss choice - and pick the acceptable failure mode.
