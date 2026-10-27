@@ -751,3 +751,15 @@ Intervention: Drafted 26 nodes from `maps/software-development.md` (12 reusing t
 Evidence: events.jsonl 143 -> 169 lines; `verify_chain` passes (169 events, 26 `node_created`); every node id referenced by evidence/flag events resolves to a registered node. Deliberate skips (recorded, not dropped): the two NEW candidate strands (real-time systems, process supervision) and the "supervision" third of the idempotency/delivery/supervision row — candidates, not map rows yet.
 
 Verdict: keep — node identity stays the learner's call; splits/merges land as future events, never rewrites.
+
+---
+
+## 2026-10-26 — Numeric reps as the lesson format for rate/pressure concepts
+
+Hypothesis: For concepts whose insight lives in a number (load vs capacity), having the learner COMPUTE the rates beats prose contrast; learner explicitly requested "reps" after the 10-25 PARTIAL on backoff's depressurization job.
+
+Intervention: Backoff lesson run as pure arithmetic reps in a Discord thread: fixed 5s timer (1,000 clients / 5s = 200 rps vs 100 capacity, constant forever) vs doubling timer (decay to 12.5 rps). No new theory.
+
+Evidence: All arithmetic unaided, including the key direction question (fixed timer = constant pressure). The one knot was a mental-model assumption (provider healthy; crowd in lockstep needing a queue), not the math — coaching point: ask "what state is the dependency in?" early. Learner independently invented queue-based throttling, which became the contrast case. Insight closed at explained (coached); delayed re-check owed 10-29 to 11-02.
+
+Verdict: keep the format for quantitative nodes. Follow-up: when the learner invents a real pattern (queue/throttling), name it and bank it as a future rep target — it's free mechanism-derivation.

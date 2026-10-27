@@ -8,11 +8,11 @@
 
 ### sd/atomicity
 > Can identify which writes belong in one atomic unit (all-or-nothing, rollback) and place the boundary relative to the point of no return.
-- level: explained (unaided); unaided: explained; retention win; events: 8; last: 2026-10-21T00:00:00Z
+- level: explained (unaided); unaided: explained; retention win; events: 9; last: 2026-10-26T00:00:00Z
 
 ### sd/backoff
 > Can explain multiplicative wait between retries and why it protects a recovering dependency.
-- level: transferred (unaided); unaided: transferred; retention win; events: 7; last: 2026-10-25T00:00:00Z
+- level: transferred (unaided); unaided: transferred; retention win; events: 8; last: 2026-10-26T00:00:00Z
 
 ### sd/crash-window
 > Can locate the crash window - the gap between two durable steps where a crash forces a duplication-vs-loss choice - and pick the acceptable failure mode.
