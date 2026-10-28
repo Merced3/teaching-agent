@@ -36,7 +36,7 @@
 
 ### sd/reconciliation-job
 > Can design a bounded background job that resolves unknown outcomes via provider query by request ID, escalating to a human when pending too long.
-- level: applied (unaided); unaided: applied; no delayed evidence; events: 11; last: 2026-10-23T00:00:00Z
+- level: applied (unaided); unaided: applied; no delayed evidence; events: 12; last: 2026-10-27T00:00:00Z
 
 ### sd/state-machine
 > Can model a lifecycle as named states + allowed transitions, using a middle state (e.g. CLOSING) as a witness to where a crash happened.
@@ -44,7 +44,7 @@
 
 ### sd/thundering-herd
 > Can recognize that a mass of simultaneous valid retries can re-crash a recovering provider.
-- level: explained (unaided); unaided: explained; no delayed evidence; events: 2; last: 2026-10-24T00:00:00Z
+- level: explained (unaided); unaided: explained; retention win; events: 3; last: 2026-10-28T00:00:00Z
 
 ### sd/timeout-unknown-state
 > After an outside call times out, can enumerate executed/pending/failed, refuse blind retry, and reset to a known state (stay PENDING + provider query).
