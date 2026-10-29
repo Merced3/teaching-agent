@@ -763,3 +763,13 @@ Intervention: Backoff lesson run as pure arithmetic reps in a Discord thread: fi
 Evidence: All arithmetic unaided, including the key direction question (fixed timer = constant pressure). The one knot was a mental-model assumption (provider healthy; crowd in lockstep needing a queue), not the math — coaching point: ask "what state is the dependency in?" early. Learner independently invented queue-based throttling, which became the contrast case. Insight closed at explained (coached); delayed re-check owed 10-29 to 11-02.
 
 Verdict: keep the format for quantitative nodes. Follow-up: when the learner invents a real pattern (queue/throttling), name it and bank it as a future rep target — it's free mechanism-derivation.
+
+## 2026-10-28 — Synthesis probes go early or fresh, not end-of-lesson
+
+Hypothesis: A full-pattern playback at the end of a long rebuild lesson measures fatigue as much as knowledge.
+
+Intervention: Keyed-receipt rebuild lesson (after a 5-day retention failure) ended with an "explain the whole pattern to a coworker" synthesis probe, asked after ~6 exchanges when the learner was flagging tiredness.
+
+Evidence: Every individual piece came out correct unaided across the lesson (receipt-before-send, crash-window enumeration, same-vs-new fingerprint), but the end-of-lesson synthesis had the sequence garbled — pieces right, ordering shuffled — and the learner explicitly reported fatigue. Under fatigue, synthesis/ordering degrades before individual pieces do (also logged in learner.md).
+
+Verdict: change. Schedule the integrative synthesis probe early in a lesson or at the start of a fresh session, not as the closing rep of a long one; end lessons at the first fatigue signal. The 11-01..11-05 cold re-probe of keyed-receipt should open with the ordered full-pattern playback.
