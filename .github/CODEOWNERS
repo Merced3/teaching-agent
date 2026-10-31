@@ -1,0 +1,15 @@
+# Human review for the KB write path, learning spine, autonomy, and deploy wiring.
+/CORE-CONSTRAINTS.md @Merced3
+/AGENTS.md @Merced3
+/.github/ @Merced3
+/docs/thesis.md @Merced3
+/docs/learner.md @Merced3
+/docs/routing.md @Merced3
+/docs/decision-log.md @Merced3
+/docs/proposals/knowledge-storage.md @Merced3
+/scripts/kb_lib.py @Merced3
+/scripts/kb_append.py @Merced3
+/scripts/kb_derive.py @Merced3
+/scripts/kb_migrate.py @Merced3
+/src/ @Merced3
+/pyproject.toml @Merced3
