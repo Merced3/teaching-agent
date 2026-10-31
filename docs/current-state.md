@@ -12,7 +12,7 @@
 
 ### sd/backoff
 > Can explain multiplicative wait between retries and why it protects a recovering dependency.
-- level: transferred (unaided); unaided: transferred; retention win; events: 8; last: 2026-10-26T00:00:00Z
+- level: transferred (unaided); unaided: transferred; retention win; events: 10; last: 2026-10-30T00:00:00Z
 
 ### sd/crash-window
 > Can locate the crash window - the gap between two durable steps where a crash forces a duplication-vs-loss choice - and pick the acceptable failure mode.
@@ -48,7 +48,7 @@
 
 ### sd/timeout-unknown-state
 > After an outside call times out, can enumerate executed/pending/failed, refuse blind retry, and reset to a known state (stay PENDING + provider query).
-- level: applied (unaided); unaided: applied; retention win; events: 8; last: 2026-10-23T00:00:00Z
+- level: applied (unaided); unaided: applied; retention win; events: 9; last: 2026-10-30T00:00:00Z
 
 ### sd/write-boundary
 > Can identify the perimeter of state-changing code paths and knows invariants must be enforced on every write path.
