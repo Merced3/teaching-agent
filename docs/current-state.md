@@ -34,6 +34,10 @@
 > Can design a retry-safe operation: receipt written before the send, retry reads the receipt and returns the recorded result instead of re-executing.
 - level: transferred (unaided); unaided: transferred; retention win; events: 26; last: 2026-10-28T00:00:00Z
 
+### sd/purpose-of-tests
+> Can state what tests buy: regression detection and authorization of output (incl. AI output), not proof of correctness.
+- level: explained (unaided); unaided: explained; no delayed evidence; events: 1; last: 2026-11-02T00:00:00Z
+
 ### sd/reconciliation-job
 > Can design a bounded background job that resolves unknown outcomes via provider query by request ID, escalating to a human when pending too long.
 - level: applied (unaided); unaided: applied; no delayed evidence; events: 12; last: 2026-10-27T00:00:00Z
@@ -48,7 +52,7 @@
 
 ### sd/timeout-unknown-state
 > After an outside call times out, can enumerate executed/pending/failed, refuse blind retry, and reset to a known state (stay PENDING + provider query).
-- level: applied (unaided); unaided: applied; retention win; events: 9; last: 2026-10-30T00:00:00Z
+- level: applied (unaided); unaided: applied; retention win; events: 10; last: 2026-11-02T00:00:00Z
 
 ### sd/write-boundary
 > Can identify the perimeter of state-changing code paths and knows invariants must be enforced on every write path.
