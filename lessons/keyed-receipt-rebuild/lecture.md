@@ -1,0 +1,21 @@
+# The keyed receipt, rebuilt: the pattern around the artifact
+
+Yesterday, cold, a week after you last touched this, I asked you how to make a retried send safe. You gave me one line: make a receipt of the completed action. Then you said, honestly, that you didn't remember the rest.
+
+So this episode is the rebuild. You kept the artifact — the receipt — and that's genuinely the heart. What faded is the pattern around it, and the pattern is three load-bearing details. Let's put each one back where it belongs.
+
+Detail one: timing. The receipt is written before the send, or atomically with it — never after. Why? Because the danger zone is the crash window, the gap between two durable steps. If the send goes out first and the receipt second, there's a sliver of time where the charge exists in the world but no record of it exists in your store. Crash in that sliver and you've lost the very information the receipt was invented to keep. Writing the receipt first flips that: worst case, you have a receipt for a send that never happened — a record you can reconcile — instead of a send you can't account for. You already own the crash-window idea; this is just it, applied.
+
+Detail two: the key. The receipt is stored under the request ID — the same ID the caller attaches to the attempt and re-attaches on every retry. That key is what makes the receipt findable later. Without it, the receipt is a diary entry; with it, it's a lookup. One operation, one ID, one receipt. The ID is the thread that ties the first attempt and every retry into the same logical action.
+
+Detail three — the one that matters most, and the one that faded hardest: what the retry does with the receipt. When a retry arrives carrying an ID that's already in your store, the handler does not redo the work. It also doesn't just skip and stay silent, and it doesn't throw a duplicate error. It reads the receipt and returns the recorded result — the same success, the same confirmation, the caller would have gotten if nothing had ever crashed.
+
+Here's why that exact move is the whole trick. The caller retried because it doesn't know what happened. It's sitting in the dark: did the charge go through, or not? Skipping silently leaves it in the dark. Erroring leaves it in the dark. Only handing back the recorded outcome turns the lights on. The retry isn't a repeated action — it's a recovered answer. The receipt isn't a dedup flag saying "this ran." It's the answer, saved, waiting to be served to whoever comes back asking.
+
+So the full pattern, end to end, fits in four moves. One: caller attaches a request ID. Two: handler checks its own durable store for a receipt under that ID. Three: absent — write the receipt, keyed by the ID, before or atomically with the send, then send, then record the outcome in the receipt and return it. Four: present — read the receipt and return the recorded result without re-executing anything.
+
+Notice where the receipt lives: your store, not the provider's. The provider is the outside world; you can't make it transactional. Your own store, you can. So the atomicity you control guards the one window you can't afford to leave open.
+
+One line to keep: the receipt is the answer, saved — and a retry is someone coming back for the answer the crash stole.
+
+Your cold rep for later, unchanged: from a blank page, write the handler. Check the store. Absent — receipt first, send, record, return. Present — read, return the recorded result. If the why behind each line feels structural rather than memorized, the rebuild took.

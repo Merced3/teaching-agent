@@ -32,7 +32,7 @@
 
 ### sd/keyed-receipt
 > Can design a retry-safe operation: receipt written before the send, retry reads the receipt and returns the recorded result instead of re-executing.
-- level: transferred (unaided); unaided: transferred; retention win; events: 26; last: 2026-10-28T00:00:00Z
+- level: transferred (unaided); unaided: transferred; retention win; events: 28; last: 2026-11-04T00:00:00Z
 
 ### sd/purpose-of-tests
 > Can state what tests buy: regression detection and authorization of output (incl. AI output), not proof of correctness.
