@@ -32,7 +32,7 @@
 
 ### sd/keyed-receipt
 > Can design a retry-safe operation: receipt written before the send, retry reads the receipt and returns the recorded result instead of re-executing.
-- level: transferred (unaided); unaided: transferred; retention win; events: 28; last: 2026-11-04T00:00:00Z
+- level: transferred (unaided); unaided: transferred; retention win; events: 30; last: 2026-11-05T00:00:00Z
 
 ### sd/purpose-of-tests
 > Can state what tests buy: regression detection and authorization of output (incl. AI output), not proof of correctness.
@@ -40,7 +40,7 @@
 
 ### sd/reconciliation-job
 > Can design a bounded background job that resolves unknown outcomes via provider query by request ID, escalating to a human when pending too long.
-- level: applied (unaided); unaided: applied; no delayed evidence; events: 12; last: 2026-10-27T00:00:00Z
+- level: transferred (unaided); unaided: transferred; retention win; events: 13; last: 2026-11-05T00:00:00Z
 
 ### sd/state-machine
 > Can model a lifecycle as named states + allowed transitions, using a middle state (e.g. CLOSING) as a witness to where a crash happened.
