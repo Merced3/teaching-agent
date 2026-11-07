@@ -16,7 +16,7 @@
 
 ### sd/crash-window
 > Can locate the crash window - the gap between two durable steps where a crash forces a duplication-vs-loss choice - and pick the acceptable failure mode.
-- level: applied (unaided); unaided: applied; retention win; events: 8; last: 2026-10-23T00:00:00Z
+- level: applied (unaided); unaided: applied; retention win; events: 9; last: 2026-11-06T00:00:00Z
 
 ### sd/idempotency
 > Can distinguish idempotency (same effect regardless of run count) from retry-safety (caller may retry blindly and still learn the result).
@@ -32,11 +32,11 @@
 
 ### sd/keyed-receipt
 > Can design a retry-safe operation: receipt written before the send, retry reads the receipt and returns the recorded result instead of re-executing.
-- level: transferred (unaided); unaided: transferred; retention win; events: 30; last: 2026-11-05T00:00:00Z
+- level: transferred (unaided); unaided: transferred; retention win; events: 31; last: 2026-11-06T00:00:00Z
 
 ### sd/purpose-of-tests
 > Can state what tests buy: regression detection and authorization of output (incl. AI output), not proof of correctness.
-- level: explained (unaided); unaided: explained; no delayed evidence; events: 1; last: 2026-11-02T00:00:00Z
+- level: explained (unaided); unaided: explained; no delayed evidence; events: 3; last: 2026-11-06T00:00:00Z
 
 ### sd/reconciliation-job
 > Can design a bounded background job that resolves unknown outcomes via provider query by request ID, escalating to a human when pending too long.
@@ -44,7 +44,7 @@
 
 ### sd/state-machine
 > Can model a lifecycle as named states + allowed transitions, using a middle state (e.g. CLOSING) as a witness to where a crash happened.
-- level: explained (unaided); unaided: explained; retention win; events: 8; last: 2026-10-23T00:00:00Z
+- level: explained (unaided); unaided: explained; retention win; events: 9; last: 2026-11-06T00:00:00Z
 
 ### sd/thundering-herd
 > Can recognize that a mass of simultaneous valid retries can re-crash a recovering provider.

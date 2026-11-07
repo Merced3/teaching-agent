@@ -773,3 +773,19 @@ Intervention: Keyed-receipt rebuild lesson (after a 5-day retention failure) end
 Evidence: Every individual piece came out correct unaided across the lesson (receipt-before-send, crash-window enumeration, same-vs-new fingerprint), but the end-of-lesson synthesis had the sequence garbled — pieces right, ordering shuffled — and the learner explicitly reported fatigue. Under fatigue, synthesis/ordering degrades before individual pieces do (also logged in learner.md).
 
 Verdict: change. Schedule the integrative synthesis probe early in a lesson or at the start of a fresh session, not as the closing rep of a long one; end lessons at the first fatigue signal. The 11-01..11-05 cold re-probe of keyed-receipt should open with the ordered full-pattern playback.
+
+## 2026-11-06 — The [lecture-file:] directive only fires via the /lecture slash command
+
+Hypothesis: (mistaken, held by the teacher) emitting `[lecture-file: lessons/<slug>/lecture.md]` in any reply triggers the audio render + served link.
+
+Evidence: On 2026-11-04 the learner asked in plain chat for "a lecture on what you think I should study." The teacher wrote lessons/keyed-receipt-rebuild/lecture.md and ended the reply with the directive — nothing rendered, no link posted, learner had to ask where the Tailscale link was. Code read (src/teaching_agent/engine.py, lectures.py): `split_directive` is called ONLY in `_produce_lecture`, which runs only from the `/lecture` interaction. In a plain message the directive line is inert.
+
+Verdict: operational rule, no code change needed. When the learner requests a lecture in plain chat, the teacher may draft the markdown (knowledge-base authoring is its job) but must tell the learner to run `/lecture topic:<slug>` to get audio; the render+serve pipeline is command-triggered by design. Worked correctly on re-run: learner ran `/lecture topic:keyed-receipt rebuild`, episode rendered and served from the pre-written file.
+
+## 2026-11-06 — Rebuild-by-lecture for a faded pattern: keep, with a production rep as the gate
+
+Hypothesis: When a full pattern fades cold (keyed-receipt, 11-04: artifact retained, timing/keying/retry-behavior lost), a short targeted lecture episode on exactly the faded details + a next-day blank-page production rep restores it faster than a full interactive rebuild lesson (the 10-28 pattern, which fatigue-garbled).
+
+Evidence: Lecture 11-04 (presented, UNPROBED) → 11-05 blank-page rep: receipt-before-send timing WON back unaided (the detail that failed cold), but check-the-store-on-arrival and return-recorded-result still absent; learner instead routed retries through the reconciliation job (unprompted 9-day transfer WIN on sd/reconciliation-job) with an inverted no-ID belief. One pointed question ("receipt says completed — provider call?") + one coached correction ("receipt first, provider second") closed the composition 11-06, coached.
+
+Verdict: keep the lecture+rep rebuild shape — cheaper than a full lesson and the faded detail did return unaided. Two caveats: (1) the composition of adjacent patterns (receipt fast path vs reconciliation fallback) does NOT come for free from knowing both parts — probe composition explicitly; (2) the 11-06 closure was coached, so keyed-receipt owes an UNAIDED full-pattern cold re-check (~11-10..13) before its grade can hold.
