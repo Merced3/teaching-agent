@@ -517,16 +517,15 @@ class TeachingEngine:
                 # Background: the kickoff is a full pi turn and must not
                 # block the reply/command that carried the lesson start.
                 asyncio.create_task(self._post_lesson_kickoff(thread_id))
-        elif event == "end":
+        elif event == "end" and self._current is not None:
             # The lesson's session stays COMPLETE and frozen — so its working
             # memory is checkpointed to files FIRST (files are long-term
             # memory; a session frozen without the close checklist discards
             # whatever it held). Then general chat continues in a fresh main
             # session.
-            if self._current is not None:
-                self._sessions.mark_closing(self._current.id)
-                await self._ask_pi_raw(self._settings.discord_channel_id, _COMMAND_PROMPTS["close"])
-                await self._rotate_session(owner=MAIN_OWNER)
+            self._sessions.mark_closing(self._current.id)
+            await self._ask_pi_raw(self._settings.discord_channel_id, _COMMAND_PROMPTS["close"])
+            await self._rotate_session(owner=MAIN_OWNER)
 
     async def _post_lesson_kickoff(self, thread_id: int) -> None:
         """The first message of a lesson thread: pi's WHY/WHAT brief. A

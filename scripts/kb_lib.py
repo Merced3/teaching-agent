@@ -57,9 +57,8 @@ def validate_event(event: dict) -> None:
             raise KBError("node_created requires node and statement")
         if "edges" in event and not isinstance(event["edges"], list):
             raise KBError("edges must be a list")
-    elif etype == "migration_flag":
-        if event.get("unverified") is not True:
-            raise KBError("migration_flag must carry unverified: true")
+    elif etype == "migration_flag" and event.get("unverified") is not True:
+        raise KBError("migration_flag must carry unverified: true")
 
 
 def log_path(kb: Path, name: str = "events") -> Path:
