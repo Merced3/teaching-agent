@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+from configparser import RawConfigParser
 from pathlib import Path
 
 from alembic import command
@@ -16,7 +17,7 @@ def upgrade(database: str, database_url: str) -> None:
     if database not in {"teaching", "knowledge"}:
         raise ValueError("database must be teaching or knowledge")
     script_location = _MIGRATIONS / database
-    config = Config()
+    config = Config(configparser=RawConfigParser())
     config.set_main_option("script_location", str(script_location))
     sqlalchemy_url = database_url
     if sqlalchemy_url.startswith("postgresql://"):

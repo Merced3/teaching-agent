@@ -32,7 +32,7 @@ def _schema_url(url: str, schema: str) -> str:
 
 
 @pytest.fixture
-def postgres_schema(request: pytest.FixtureRequest) -> tuple[str, str]:
+def postgres_schema(request: pytest.FixtureRequest) -> str:
     marker = request.node.get_closest_marker("database")
     env_name = marker.args[0] if marker else "TEACHING_AGENT_TEST_POSTGRES_URL"
     base_url = os.environ.get(env_name, "").strip()
@@ -42,15 +42,15 @@ def postgres_schema(request: pytest.FixtureRequest) -> tuple[str, str]:
     with psycopg.connect(base_url) as conn:
         conn.execute(f'CREATE SCHEMA "{schema}"')
     try:
-        yield schema, _schema_url(base_url, schema)
+        yield schema
     finally:
         with psycopg.connect(base_url) as conn:
             conn.execute(f'DROP SCHEMA "{schema}" CASCADE')
 
 
 @pytest.mark.database("TEACHING_AGENT_TEST_POSTGRES_URL")
-def test_operational_state_round_trip(postgres_schema: tuple[str, str]) -> None:
-    _, url = postgres_schema
+def test_operational_state_round_trip(postgres_schema: str) -> None:
+    url = _schema_url(os.environ["TEACHING_AGENT_TEST_POSTGRES_URL"], postgres_schema)
     upgrade("teaching", url)
     store = PostgresStateStore(url)
     assert store.load("pings") is None
@@ -62,9 +62,9 @@ def test_operational_state_round_trip(postgres_schema: tuple[str, str]) -> None:
 
 @pytest.mark.database("KNOWLEDGE_TEST_DATABASE_URL")
 def test_postgres_kb_behaviors_and_export(
-    postgres_schema: tuple[str, str], tmp_path: Path
+    postgres_schema: str, tmp_path: Path
 ) -> None:
-    _, url = postgres_schema
+    url = _schema_url(os.environ["KNOWLEDGE_TEST_DATABASE_URL"], postgres_schema)
     upgrade("knowledge", url)
     kb = tmp_path / "kb"
     env = os.environ.copy()
