@@ -61,6 +61,6 @@ generated `docs/current-state.md` outside the event-log write path.
 ## Session discipline
 
 - Start at the handoff, not from chat memory.
-- Evidence is recorded as **events**, not prose: append one event per node touched via `python scripts/kb_append.py --kb kb append --event '{...}'` (level + `delay_days` + `coached`; see docs/proposals/knowledge-storage.md). `kb/events.jsonl` is the source of truth and `kb_append.py` is the ONLY write path — never edit the log files directly.
+- Evidence is recorded as **events**, not prose: append one event per node touched via `python scripts/kb_append.py --kb kb append --event '{...}'` (level + `delay_days` + `coached`; see docs/proposals/knowledge-storage.md). The separate `knowledge` Postgres DB is the source of truth and `kb_append.py` is the ONLY ordinary write path — never edit the DB records or exported log files directly. `kb/events.jsonl` is a nightly export.
 - `docs/current-state.md` is a **generated view** (`python scripts/kb_derive.py --kb kb current-state --out docs/current-state.md`) — never hand-edit it. Regenerate it after appending events.
 - End sessions by recording events, regenerating the view, and updating the decision log so the next session — any model, any harness — can resume with minimal drift.

@@ -3,6 +3,8 @@ not uploads, so the callback server must serve them safely."""
 
 from __future__ import annotations
 
+from io import BytesIO
+
 import httpx
 
 from teaching_agent.callback_server import create_callback_app
@@ -41,6 +43,18 @@ async def test_path_traversal_is_rejected(tmp_path) -> None:
     app = create_callback_app(_dispatch, lectures_dir=served)
     response = await _get(app, "/lectures/..%2Fsecret.txt")
     assert response.status_code == 404
+
+
+async def test_lecture_is_served_from_r2_when_configured() -> None:
+    class Objects:
+        def open(self, key):
+            assert key == "lectures/crash-proofing/lecture.mp3"
+            return BytesIO(b"remote-mp3"), 10
+
+    app = create_callback_app(_dispatch, object_storage=Objects())
+    response = await _get(app, "/lectures/crash-proofing/lecture.mp3")
+    assert response.status_code == 200
+    assert response.content == b"remote-mp3"
 
 
 async def test_lectures_route_absent_without_dir() -> None:

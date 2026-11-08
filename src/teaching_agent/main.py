@@ -85,6 +85,7 @@ async def agent_service(ctx: ServiceContext) -> None:
         remote_ptt=getattr(engine, "remote_ptt", None),
         ptt_token=settings.voice_ptt_token,
         lectures_dir=settings.knowledge_root / "lessons",
+        object_storage=engine._object_storage,
     )
     server = uvicorn.Server(
         uvicorn.Config(
@@ -143,7 +144,12 @@ def main() -> None:
         level=os.environ.get("TEACHING_AGENT_LOG_LEVEL", "INFO").upper(),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    harness = Harness(HarnessConfig(data_dir="data"), name="teaching-agent")
+    harness = Harness(
+        HarnessConfig(
+            data_dir="data", database_url=os.environ.get("HARNESS_DATABASE_URL") or None
+        ),
+        name="teaching-agent",
+    )
     harness.add_service("teaching-agent", agent_service)
     harness.run()  # async runtime: harness owns the event loop
 

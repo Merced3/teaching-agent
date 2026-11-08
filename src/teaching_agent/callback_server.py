@@ -8,14 +8,18 @@ For messages, any 2xx acknowledges delivery.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 
+from .object_storage import ObjectStorage
 from .voice.ptt import RemotePTT
+
+logger = logging.getLogger(__name__)
 
 Dispatch = Callable[[dict[str, Any]], Awaitable[dict[str, Any] | None]]
 
@@ -66,6 +70,7 @@ def create_callback_app(
     remote_ptt: RemotePTT | None = None,
     ptt_token: str = "",
     lectures_dir: Path | None = None,
+    object_storage: ObjectStorage | None = None,
 ) -> FastAPI:
     app = FastAPI(title="teaching-agent-callback")
 
@@ -86,7 +91,21 @@ def create_callback_app(
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    if lectures_dir is not None:
+    if object_storage is not None:
+
+        @app.get("/lectures/{path:path}")
+        async def lecture_object(path: str) -> Response:
+            if not path or path.startswith("/") or ".." in Path(path).parts:
+                return Response(status_code=404)
+            try:
+                body, length = object_storage.open(f"lectures/{path}")
+            except Exception:
+                logger.exception("R2 lecture fetch failed: %s", path)
+                return Response(status_code=404)
+            headers = {"Content-Length": str(length)} if length is not None else None
+            return StreamingResponse(body, media_type="audio/mpeg", headers=headers)
+
+    elif lectures_dir is not None:
         # /lecture episodes are served as links, not Discord uploads: the
         # learner listens on the phone over LAN/Tailscale, and long
         # episodes would brush Discord's free upload cap anyway.

@@ -239,3 +239,15 @@ Open questions resolved with the learner:
   coached event can't yield an unaided claim; a retention claim requires
   `delay_days > 0`).
 - **Migration honesty.** Unparseable source text is flagged, not guessed.
+
+## P2c amendment (owner-approved 2026-11-08): Postgres is authoritative
+
+The separate, project-independent `knowledge` Postgres DB replaces JSONL as the
+source of truth. The actual seed used only `kb/events.jsonl` (including all 26
+`node_created` events); there is no populated `kb/nodes.jsonl` to migrate.
+`events` preserves stable ids and exact raw lines, and DB triggers enforce the
+hash chain on INSERT and reject UPDATE/DELETE. `nodes` is the derived registry.
+`kb_append.py` remains the sole ordinary write path and retains the explicit
+`--init` genesis guard. JSONL is a nightly verified export for portability and
+git snapshots. Every invariant and behavior test above remains authoritative.
+See `docs/postgres-migration.md` and the 2026-11-08 decision-log entry.

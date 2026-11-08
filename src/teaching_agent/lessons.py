@@ -27,7 +27,6 @@ lives under data/ and never in the knowledge base.
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from pathlib import Path
@@ -37,6 +36,8 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from .hub_client import HubClient
+
+from .storage import JsonStateStore, StateStore, state_key
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +55,12 @@ class LessonManager:
         channel_id: int,
         state_file: Path,
         on_boundary: Callable[[str, int | None], Awaitable[Any]] | None = None,
+        store: StateStore | None = None,
     ) -> None:
         self._hub = hub
         self._channel_id = channel_id
-        self._state_file = state_file
+        self._store = store or JsonStateStore(state_file)
+        self._state_key = state_key(state_file)
         # Session-architecture hook (decision log 2026-10-06): the engine
         # owns pi session lifecycles; lesson start/end are the boundaries
         # that re-type or rotate them. Pure transport here — the callback
@@ -179,7 +182,7 @@ class LessonManager:
 
     def _load(self) -> None:
         try:
-            data = json.loads(self._state_file.read_text(encoding="utf-8"))
+            data = self._store.load(self._state_key) or {}
             self._thread_id = int(data["thread_id"])
             self._topic = str(data.get("topic") or "") or None
             logger.info("Resumed active lesson %r (thread %s).", self._topic, self._thread_id)
@@ -189,13 +192,11 @@ class LessonManager:
 
     def _save(self) -> None:
         try:
-            self._state_file.parent.mkdir(parents=True, exist_ok=True)
             if self._thread_id is None:
-                self._state_file.unlink(missing_ok=True)
+                self._store.delete(self._state_key)
             else:
-                self._state_file.write_text(
-                    json.dumps({"thread_id": self._thread_id, "topic": self._topic}),
-                    encoding="utf-8",
+                self._store.save(
+                    self._state_key, {"thread_id": self._thread_id, "topic": self._topic}
                 )
         except OSError:
             logger.warning("Lesson state save failed.", exc_info=True)

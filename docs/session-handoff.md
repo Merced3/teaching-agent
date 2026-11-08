@@ -20,7 +20,8 @@ Before teaching, planning, or changing anything:
 
 1. Read AGENTS.md completely — especially the spine, the meta-rule, and the evidence rules.
 2. Read docs/thesis.md, docs/learner.md, docs/current-state.md (**GENERATED — do not
-   hand-edit**; the source of truth is `kb/events.jsonl`, read it for raw evidence),
+   hand-edit**; the source of truth is the separate `knowledge` Postgres DB;
+   `kb/events.jsonl` is its verified nightly export),
    docs/decision-log.md, docs/goal.md (what the learner is shooting for), and
    docs/routing.md (how the next node is computed). Until the migration review
    (PR #1, 40 flags) is complete, the pre-log prose state — owed pings, routing

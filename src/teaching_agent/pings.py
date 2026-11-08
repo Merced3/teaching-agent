@@ -12,13 +12,14 @@ is plumbing: WHEN to wake the teacher, never WHAT to say.
 
 from __future__ import annotations
 
-import json
 import logging
 import random
 from dataclasses import dataclass, replace
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+from .storage import JsonStateStore, StateStore, state_key
 
 logger = logging.getLogger(__name__)
 
@@ -46,10 +47,12 @@ class PingController:
         window_end_hour: int = 22,
         default_count: int = 3,
         timezone_name: str = "America/Chicago",
+        store: StateStore | None = None,
     ) -> None:
         if not 0 <= window_start_hour < window_end_hour <= 24:
             raise ValueError("ping window must satisfy 0 <= start < end <= 24")
-        self._state_file = state_file
+        self._store = store or JsonStateStore(state_file)
+        self._state_key = state_key(state_file)
         # Constructor hours are boot defaults only; /pings window overrides
         # them live via the state file (same pattern as the count).
         self._env_start_hour = window_start_hour
@@ -73,9 +76,8 @@ class PingController:
     # -- state ----------------------------------------------------------
 
     def _load(self) -> _State:
-        try:
-            raw = json.loads(self._state_file.read_text(encoding="utf-8"))
-        except (FileNotFoundError, json.JSONDecodeError, OSError):
+        raw = self._store.load(self._state_key)
+        if not isinstance(raw, dict):
             return _State(pings_per_day=self._default_count, last_fired=None)
         count = raw.get("pings_per_day", self._default_count)
         last = raw.get("last_fired")
@@ -91,16 +93,13 @@ class PingController:
         )
 
     def _save(self, state: _State) -> None:
-        self._state_file.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "pings_per_day": state.pings_per_day,
             "window_start_hour": state.window_start_hour,
             "window_end_hour": state.window_end_hour,
             "last_fired": state.last_fired.isoformat() if state.last_fired else None,
         }
-        tmp = self._state_file.with_suffix(self._state_file.suffix + ".tmp")
-        tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        tmp.replace(self._state_file)
+        self._store.save(self._state_key, payload)
 
     def count(self) -> int:
         """Pings per day; 0 = off. Read live so /pings applies without restart."""
