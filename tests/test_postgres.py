@@ -95,12 +95,18 @@ def test_postgres_kb_behaviors_and_export(
     assert initialized.returncode == 0
     assert duplicate_init.returncode != 0
     assert run("kb_append.py", "--kb", str(kb), "append", "--event", event).returncode == 0
+    node = json.dumps({
+        "type": "node_created", "node": "sd/atomicity",
+        "statement": "all-or-nothing writes", "edges": [],
+    })
+    node_result = run("kb_append.py", "--kb", str(kb), "append", "--event", node)
+    assert node_result.returncode == 0, node_result.stderr
 
     exported = tmp_path / "events.jsonl"
     result = run("kb_derive.py", "--kb", str(kb), "export-jsonl", "--out", str(exported))
     assert result.returncode == 0, result.stderr
     lines = exported.read_text(encoding="utf-8").splitlines()
-    assert len(lines) == 2
+    assert len(lines) == 3
     assert json.loads(lines[1])["prev"] is not None
 
     grades = run("kb_derive.py", "--kb", str(kb), "grades")
