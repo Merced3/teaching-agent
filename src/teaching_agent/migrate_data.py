@@ -70,7 +70,11 @@ def copy_generated_assets(source_root: Path) -> dict:
         if not path.is_file() or path.suffix.lower() not in {".mp3", ".pcm"}:
             continue
         relative = path.relative_to(source_root).as_posix()
-        key = relative if relative.startswith(("lessons/", "out/")) else f"out/{relative}"
+        key = (
+            f"lectures/{relative.removeprefix('lessons/')}"
+            if relative.startswith("lessons/")
+            else relative if relative.startswith("out/") else f"out/{relative}"
+        )
         client.upload_file(str(path), bucket, key, ExtraArgs={"ContentType": "audio/mpeg"})
         head = client.head_object(Bucket=bucket, Key=key)
         body = client.get_object(Bucket=bucket, Key=key)["Body"].read()
