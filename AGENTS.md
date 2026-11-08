@@ -49,6 +49,15 @@ When the learner asks for a plan, says "before creating/changing anything," or r
 - The learner model and learner data are private by default. Any public-facing artifact (e.g., a shareable knowledge tree) is a separate, explicit, opt-in decision.
 - Never read secrets (`.env`, tokens) or private data outside the stated scope.
 
+## Development and live acceptance
+
+Keep ordinary tests offline. When a change needs live Discord acceptance, follow
+**`Automations/ops/LAB.md`** for generic channel claim/check/release and
+protected registration history. Teaching Agent still owns `/mode test`, its
+home-channel configuration, isolated knowledge-base/runtime state, provider
+cost limits, and production restoration. Do not write live evidence into the
+generated `docs/current-state.md` outside the event-log write path.
+
 ## Session discipline
 
 - Start at the handoff, not from chat memory.

@@ -47,3 +47,11 @@ python -m teaching_agent.main
 **Unprompted pings (2026-10-09):** when enabled, the agent pings at **N random times per day** inside a waking window (default 3/day, 08:00–23:00, min 45 min apart; slots are drawn deterministically per date so restarts can't double-fire or skip). Per `docs/routing.md`, each ping is exactly one of: an owed recall question, a re-verification of an aging `known` node, or a one-line lesson offer at the current edge (teaching itself never starts unprompted). Missed slots during downtime collapse to a single catch-up ping, not a backlog. Tune it live from Discord: `/pings 5`, `/pings off`, `/pings status` (persisted in `data/pings.json`; the `TEACHING_AGENT_PINGS_*` env vars are boot defaults only).
 
 Everything except `AGENTS.md` is a current best theory and may be rewritten — with the change logged in `docs/decision-log.md`.
+
+## Development tests and Discord acceptance
+
+Run the project's ordinary tests offline. For bounded live Discord acceptance,
+follow **`Automations/ops/LAB.md`** to claim and check the shared channel,
+protect registration history, and release it afterward. Teaching Agent's own
+checklist must cover `/mode test`, isolated knowledge-base/runtime state,
+provider limits, and restoration of its production channel and settings.
