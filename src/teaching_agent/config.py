@@ -34,6 +34,13 @@ class Settings:
     test_mode: bool
     log_level: str
     knowledge_root: Path
+    database_url: str | None
+    knowledge_database_url: str | None
+    r2_account_id: str
+    r2_access_key_id: str
+    r2_secret_access_key: str
+    r2_bucket: str
+    r2_endpoint: str
     pi_executable: str
     pi_session_directory: Path
     pi_model: str | None
@@ -102,6 +109,13 @@ class Settings:
         knowledge_root = Path(
             environment.get("TEACHING_AGENT_KNOWLEDGE_ROOT", ".").strip() or "."
         ).resolve()
+        database_url = environment.get("TEACHING_AGENT_DATABASE_URL", "").strip() or None
+        knowledge_database_url = environment.get("KNOWLEDGE_DATABASE_URL", "").strip() or None
+        r2_account_id = environment.get("TEACHING_AGENT_R2_ACCOUNT_ID", "").strip()
+        r2_access_key_id = environment.get("TEACHING_AGENT_R2_ACCESS_KEY_ID", "").strip()
+        r2_secret_access_key = environment.get("TEACHING_AGENT_R2_SECRET_ACCESS_KEY", "").strip()
+        r2_bucket = environment.get("TEACHING_AGENT_R2_BUCKET", "").strip()
+        r2_endpoint = environment.get("TEACHING_AGENT_R2_ENDPOINT", "").strip()
         pi_executable = environment.get("TEACHING_AGENT_PI_EXECUTABLE", "pi").strip()
         pi_session_directory = Path(
             environment.get("TEACHING_AGENT_PI_SESSION_DIRECTORY", "data/pi-sessions").strip()
@@ -269,6 +283,13 @@ class Settings:
             test_mode=test_mode,
             log_level=log_level,
             knowledge_root=knowledge_root,
+            database_url=database_url,
+            knowledge_database_url=knowledge_database_url,
+            r2_account_id=r2_account_id,
+            r2_access_key_id=r2_access_key_id,
+            r2_secret_access_key=r2_secret_access_key,
+            r2_bucket=r2_bucket,
+            r2_endpoint=r2_endpoint,
             pi_executable=pi_executable,
             pi_session_directory=pi_session_directory,
             pi_model=pi_model,

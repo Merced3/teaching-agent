@@ -789,3 +789,13 @@ Hypothesis: When a full pattern fades cold (keyed-receipt, 11-04: artifact retai
 Evidence: Lecture 11-04 (presented, UNPROBED) → 11-05 blank-page rep: receipt-before-send timing WON back unaided (the detail that failed cold), but check-the-store-on-arrival and return-recorded-result still absent; learner instead routed retries through the reconciliation job (unprompted 9-day transfer WIN on sd/reconciliation-job) with an inverted no-ID belief. One pointed question ("receipt says completed — provider call?") + one coached correction ("receipt first, provider second") closed the composition 11-06, coached.
 
 Verdict: keep the lecture+rep rebuild shape — cheaper than a full lesson and the faded detail did return unaided. Two caveats: (1) the composition of adjacent patterns (receipt fast path vs reconciliation fallback) does NOT come for free from knowing both parts — probe composition explicitly; (2) the 11-06 closure was coached, so keyed-receipt owes an UNAIDED full-pattern cold re-check (~11-10..13) before its grade can hold.
+
+## 2026-11-08 — Private knowledge moves to append-only Postgres (supersedes part of 2026-10-21)
+
+Hypothesis: The knowledge record can outlive teaching-agent and feed a future star map without weakening its evidence boundary if the separate `knowledge` Postgres DB—not the `teaching` DB—becomes authoritative and enforces the chain itself.
+
+Intervention: Owner explicitly approved Postgres as source of truth over a derived mirror. `kb_append.py` remains the only ordinary write path; Postgres stores stable event ids, exact canonical raw lines, JSONB payloads, timestamps and `prev`, with INSERT-time chain verification and UPDATE/DELETE rejection. `nodes` is a derived projection. JSONL becomes a verified nightly export. Operational JSON moves to `teaching`, harness state to `harness_teaching`, and generated audio to R2. Curated markdown stays in git; pi sessions stay unsynchronized working memory and must be closed before cutover.
+
+Evidence: Inventory found one actual source log (`kb/events.jsonl`, no nodes file): 196 events = 130 evidence + 40 historical flags + 26 registered nodes, authoritative chain intact. Live and laptop event payloads are identical; live/deploy clones clean and fully pushed. All 118 existing offline behavior/runtime tests pass after the backend refactor. Managed-Postgres integration tests and live copy/cutover remain the acceptance gate.
+
+Verdict: keep, pending migration counts/checksums and one real ping + `/close`. This supersedes the 2026-10-21 choice of JSONL as source and the original proposal's unpopulated `kb/nodes.jsonl` assumption; append-only evidence, deterministic derivation, honest grading, migration flags, and explicit genesis are unchanged.

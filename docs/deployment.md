@@ -44,12 +44,16 @@ automation-harness is a library installed into each app, not a process.
 
 ## Data that must survive redeploys
 
-- The repo working copy: `docs/`, `maps/`, `sessions/`, `lessons/` ARE the
-  knowledge base. The agent git-commits at session close; push to origin
-  is the backup. Since 2026-10-17 a server cron pushes every 15 min
-  (`ops/server/kb-push.sh` — push-only, never pulls; failures logged to
-  `logs/kb-push.log`, reconcile divergences by hand).
-- `data/` (pi sessions, harness state) — disposable; recreate freely.
+- Curated markdown (`docs/`, `maps/`, `sessions/`, `lessons/`) stays in the
+  KB git clone. The nightly snapshot exports authoritative Postgres events
+  to `kb/events.jsonl`; `kb-push.sh` pushes every 15 min.
+- Knowledge events live in the separate managed `knowledge` DB. Mutable
+  operational JSON lives in `teaching`; harness state in `harness_teaching`.
+  Generated audio lives in the `automations-teaching` R2 bucket. See
+  `docs/postgres-migration.md`.
+- Pi JSONL files are working memory, not a redeploy dependency: close open
+  sessions first, retain old source files read-only, and start fresh on the
+  new host. Disposable logs/status files may be recreated.
 
 ## Known follow-ups
 

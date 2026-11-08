@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from kb_lib import KBError, append_event, log_path
+from kb_lib import KBError, append_event, import_jsonl, knowledge_exists
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -36,7 +36,27 @@ def main(argv: list[str] | None = None) -> int:
         help="allow the first write to a NEW knowledge base (events.jsonl absent); "
         "refused if a log already exists",
     )
+    imported = sub.add_parser("import-jsonl", help="one-time empty-Postgres import")
+    imported.add_argument("--source", required=True, type=Path)
+    imported.add_argument("--init", action="store_true", help="confirm initial import")
     args = parser.parse_args(argv)
+
+    if args.command == "import-jsonl":
+        if not args.init or knowledge_exists(args.kb):
+            print("error: import-jsonl requires --init and an empty knowledge DB", file=sys.stderr)
+            return 1
+        from kb_lib import configured_database_url
+
+        url = configured_database_url()
+        if not url:
+            print("error: KNOWLEDGE_DATABASE_URL is required for import-jsonl", file=sys.stderr)
+            return 1
+        try:
+            print(json.dumps(import_jsonl(args.source, url), indent=2))
+        except KBError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        return 0
 
     try:
         event = json.loads(args.event)
@@ -51,18 +71,24 @@ def main(argv: list[str] | None = None) -> int:
     # far more likely — a WRONG --kb path. Starting a fresh hash chain there
     # would silently fork history (incident: 2026-10-23 migration review),
     # so the boundary refuses unless initialization is explicit.
-    path = log_path(args.kb)
-    if not path.exists() and not args.init:
+    try:
+        exists = knowledge_exists(args.kb)
+    except KBError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    if not exists and not args.init:
         print(
-            f"error: {path} not found — refusing to start a new hash chain "
+            f"error: knowledge log at {args.kb} is absent/empty — "
+            "refusing to start a new hash chain "
             "(a wrong --kb path looks exactly like this). If you are "
             "intentionally initializing a new knowledge base, pass --init.",
             file=sys.stderr,
         )
         return 1
-    if path.exists() and args.init:
+    if exists and args.init:
         print(
-            f"error: --init given but {path} already exists; drop --init to append normally.",
+            f"error: --init given but knowledge log at {args.kb} already exists; "
+            "drop --init to append normally.",
             file=sys.stderr,
         )
         return 1

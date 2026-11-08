@@ -355,7 +355,12 @@ class TeachingEngine:
         # Session architecture (decision log 2026-10-06): a persisted
         # registry of pi sessions (OPEN -> CLOSING -> COMPLETE). Sessions
         # are working memory; files are long-term memory.
-        self._sessions = SessionRegistry(settings.session_registry_file)
+        from .storage import operational_store
+
+        self._sessions = SessionRegistry(
+            settings.session_registry_file,
+            store=operational_store(settings.session_registry_file, settings.database_url),
+        )
         self._current: SessionRecord | None = None
         self._cost_warned: set[str] = set()
         self._boot_context: str | None = None
@@ -364,9 +369,13 @@ class TeachingEngine:
             settings.discord_channel_id,
             settings.lesson_state_file,
             on_boundary=self._on_lesson_boundary,
+            store=operational_store(settings.lesson_state_file, settings.database_url),
         )
-        # Audio render is injectable so tests never shell out to TTS.
+        # Audio render/storage are injectable so tests never call TTS or R2.
         self._render_audio = render_lecture_audio
+        from .object_storage import configured_object_storage
+
+        self._object_storage = configured_object_storage(settings)
         # Unprompted-ping scheduling (decision-log 2026-10-09): N random
         # times/day in a waking window, count learner-tunable via /pings.
         self._pings = PingController(
@@ -375,6 +384,7 @@ class TeachingEngine:
             window_end_hour=settings.pings_window_end_hour,
             default_count=settings.pings_per_day,
             timezone_name=settings.pings_timezone,
+            store=operational_store(settings.pings_state_file, settings.database_url),
         )
 
     async def stop(self) -> None:
@@ -823,6 +833,19 @@ class TeachingEngine:
         except (LectureError, OSError) as exc:
             await self._hub.post_message(channel_id, f"⚠️ Audio render failed: {exc}")
             return
+        if self._object_storage is not None:
+            try:
+                relative_key = audio_path.relative_to(
+                    self._settings.knowledge_root / "lessons"
+                ).as_posix()
+                key = f"lectures/{relative_key}"
+                await asyncio.to_thread(
+                    self._object_storage.upload_file, key, audio_path, "audio/mpeg"
+                )
+            except Exception as exc:
+                logger.exception("Lecture R2 upload failed")
+                await self._hub.post_message(channel_id, f"⚠️ Audio storage failed: {exc}")
+                return
         relative = audio_path.resolve().relative_to(
             (self._settings.knowledge_root / "lessons").resolve()
         )

@@ -20,12 +20,13 @@ and never in the knowledge base.
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
+
+from .storage import JsonStateStore, StateStore, state_key
 
 logger = logging.getLogger(__name__)
 
@@ -67,8 +68,9 @@ class BootScan:
 class SessionRegistry:
     """Owns the persisted lifecycle of every pi session this agent creates."""
 
-    def __init__(self, state_file: Path) -> None:
-        self._state_file = state_file
+    def __init__(self, state_file: Path, store: StateStore | None = None) -> None:
+        self._store = store or JsonStateStore(state_file)
+        self._state_key = state_key(state_file)
         self._records: dict[str, SessionRecord] = {}
         self._load()
 
@@ -183,7 +185,7 @@ class SessionRegistry:
 
     def _load(self) -> None:
         try:
-            raw = json.loads(self._state_file.read_text(encoding="utf-8"))
+            raw = self._store.load(self._state_key) or []
             for item in raw:
                 record = SessionRecord(**item)
                 self._records[record.id] = record
@@ -193,10 +195,8 @@ class SessionRegistry:
 
     def _save(self) -> None:
         try:
-            self._state_file.parent.mkdir(parents=True, exist_ok=True)
-            self._state_file.write_text(
-                json.dumps([asdict(r) for r in self._records.values()], indent=2),
-                encoding="utf-8",
+            self._store.save(
+                self._state_key, [asdict(r) for r in self._records.values()]
             )
         except OSError:
             logger.warning("Session registry save failed.", exc_info=True)
