@@ -52,7 +52,7 @@
 
 ### sd/timeout-unknown-state
 > After an outside call times out, can enumerate executed/pending/failed, refuse blind retry, and reset to a known state (stay PENDING + provider query).
-- level: applied (unaided); unaided: applied; retention win; events: 10; last: 2026-11-02T00:00:00Z
+- level: applied (unaided); unaided: applied; retention win; events: 11; last: 2026-11-07T00:00:00Z
 
 ### sd/write-boundary
 > Can identify the perimeter of state-changing code paths and knows invariants must be enforced on every write path.
