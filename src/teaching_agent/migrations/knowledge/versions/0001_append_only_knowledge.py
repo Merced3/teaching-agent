@@ -48,7 +48,8 @@ def upgrade() -> None:
                 IF previous.id IS NULL THEN
                     RAISE EXCEPTION 'event ids must be contiguous; missing %', NEW.id - 1;
                 END IF;
-                IF NEW.prev IS DISTINCT FROM encode(digest(previous.raw_line, 'sha256'), 'hex')
+                IF NEW.prev IS DISTINCT FROM
+                   encode(public.digest(previous.raw_line, 'sha256'), 'hex')
                    OR NEW.payload->>'prev' IS DISTINCT FROM NEW.prev THEN
                     RAISE EXCEPTION 'knowledge hash chain mismatch at event %', NEW.id;
                 END IF;
