@@ -17,7 +17,8 @@ def upgrade(database: str, database_url: str) -> None:
     if database not in {"teaching", "knowledge"}:
         raise ValueError("database must be teaching or knowledge")
     script_location = _MIGRATIONS / database
-    config = Config(configparser=RawConfigParser())
+    config = Config()
+    config.file_config = RawConfigParser()
     config.set_main_option("script_location", str(script_location))
     sqlalchemy_url = database_url
     if sqlalchemy_url.startswith("postgresql://"):

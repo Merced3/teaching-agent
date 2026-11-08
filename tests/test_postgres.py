@@ -24,11 +24,16 @@ from teaching_agent.storage import PostgresStateStore
 REPO = Path(__file__).resolve().parent.parent
 
 
+class _DatabaseUrl(str):
+    def __repr__(self) -> str:
+        return "<redacted database URL>"
+
+
 def _schema_url(url: str, schema: str) -> str:
     parts = urlsplit(url)
     query = dict(parse_qsl(parts.query))
     query["options"] = f"-csearch_path={schema}"
-    return urlunsplit(parts._replace(query=urlencode(query)))
+    return _DatabaseUrl(urlunsplit(parts._replace(query=urlencode(query))))
 
 
 @pytest.fixture
