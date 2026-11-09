@@ -24,7 +24,7 @@
 
 ### sd/invariant
 > Can state the rule a system's state must always satisfy, distinct from the mechanisms (atomicity, guarded writes) that guard it.
-- level: recalled (unaided); unaided: recalled; retention win; events: 8; last: 2026-10-23T00:00:00Z
+- level: recalled (unaided); unaided: recalled; retention win; events: 9; last: 2026-11-08T23:24:28Z
 
 ### sd/jitter
 > Can explain how randomizing retry timing breaks lockstep so a retrying crowd does not arrive in waves.
