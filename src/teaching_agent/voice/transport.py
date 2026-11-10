@@ -33,6 +33,10 @@ class VoiceTransport(Protocol):
         """The duplex PCM stream to attach (``WS .../voice/stream``)."""
         ...
 
+    def stream_headers(self) -> dict[str, str]:
+        """Authentication for the WebSocket handshake, never the URL."""
+        ...
+
     async def join(self, channel_id: int | None, owner: str) -> None: ...
     async def leave(self, owner: str) -> None: ...
 
@@ -42,13 +46,19 @@ class DiscordTransport:
 
     requires_channel = True
 
-    def __init__(self, hub: Any, hub_ws_url: str, allowed_user_id: int) -> None:
+    def __init__(
+        self, hub: Any, hub_ws_url: str, allowed_user_id: int, token: str
+    ) -> None:
         self._hub = hub
         self._hub_ws_url = hub_ws_url
+        self._token = token
         self.speaker_id = str(allowed_user_id)
 
     def stream_url(self, owner: str) -> str:
         return f"{self._hub_ws_url}/voice/stream?owner={owner}"
+
+    def stream_headers(self) -> dict[str, str]:
+        return {"Authorization": f"Bearer {self._token}"}
 
     async def join(self, channel_id: int | None, owner: str) -> None:
         assert channel_id is not None, "Discord voice requires a channel id."
@@ -72,6 +82,9 @@ class BridgeTransport:
 
     def stream_url(self, owner: str) -> str:
         return f"{self._bridge_ws_url}/voice/stream?owner={owner}"
+
+    def stream_headers(self) -> dict[str, str]:
+        return {}
 
     async def join(self, channel_id: int | None, owner: str) -> None:
         return None  # no channel to acquire; the page's presence is the room

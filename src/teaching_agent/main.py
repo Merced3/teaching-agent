@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_engine(settings: Settings) -> TeachingEngine:
-    hub = HubClient(settings.hub_url)
+    hub = HubClient(settings.hub_url, settings.hub_token)
     # The teacher teaches, it does not build: a pi extension physically
     # blocks write/edit outside the knowledge base and limits bash to
     # read-only commands + git (decision log 2026-10-02). Fail CLOSED: if
@@ -82,6 +82,7 @@ async def agent_service(ctx: ServiceContext) -> None:
 
     app = create_callback_app(
         engine.dispatch,
+        settings.hub_token,
         remote_ptt=getattr(engine, "remote_ptt", None),
         ptt_token=settings.voice_ptt_token,
         lectures_dir=settings.knowledge_root / "lessons",

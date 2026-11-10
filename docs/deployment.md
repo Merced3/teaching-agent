@@ -36,6 +36,9 @@ automation-harness is a library installed into each app, not a process.
 
 - `TEACHING_AGENT_HUB_URL` — stays localhost if both processes share the
   VPS; otherwise the hub's private address.
+- `TEACHING_AGENT_HUB_TOKEN` — required operator-issued project credential.
+  It authenticates every hub HTTP request and the Discord voice WebSocket
+  handshake, and verifies signed hub callbacks before dispatch.
 - `TEACHING_AGENT_CALLBACK_URL` — must be reachable FROM the hub process;
   on one host the default localhost URL is correct.
 - `TEACHING_AGENT_PI_EXECUTABLE` — absolute path to pi on the VPS.

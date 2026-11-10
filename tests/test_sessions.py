@@ -23,6 +23,7 @@ from teaching_agent.sessions import (
 ENV = {
     "DISCORD_CHANNEL_ID": "100",
     "DISCORD_ALLOWED_USER_ID": "42",
+    "TEACHING_AGENT_HUB_TOKEN": "test-project-token",
     "TEACHING_AGENT_NAME": "Alvar",
 }
 

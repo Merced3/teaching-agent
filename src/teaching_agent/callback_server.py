@@ -8,7 +8,10 @@ For messages, any 2xx acknowledges delivery.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
@@ -66,7 +69,10 @@ setInterval(() => fetch("/voice/ptt/heartbeat", {method:"POST",
 
 def create_callback_app(
     dispatch: Dispatch,
+    token: str,
     *,
+    project_id: str = "teaching-agent",
+    now: Callable[[], float] = time.time,
     remote_ptt: RemotePTT | None = None,
     ptt_token: str = "",
     lectures_dir: Path | None = None,
@@ -81,6 +87,25 @@ def create_callback_app(
 
     @app.post("/discord")
     async def discord_callback(request: Request) -> Response:
+        body = await request.body()
+        timestamp = request.headers.get("X-Discord-Hub-Timestamp", "")
+        signature = request.headers.get("X-Discord-Hub-Signature", "")
+        project = request.headers.get("X-Discord-Hub-Project", "")
+        try:
+            timestamp_seconds = int(timestamp)
+        except ValueError:
+            return _unauthorized()
+        expected = hmac.new(
+            token.encode(), f"{timestamp}.".encode() + body, hashlib.sha256
+        ).hexdigest()
+        if (
+            project != project_id
+            or abs(now() - timestamp_seconds) > 300
+            or not hmac.compare_digest(signature, f"v1={expected}")
+        ):
+            return _unauthorized()
+
+        # Authenticate the exact raw body before JSON parsing or application work.
         payload = await request.json()
         result = await dispatch(payload)
         if result is None:
@@ -147,3 +172,7 @@ def create_callback_app(
             return Response(status_code=204)
 
     return app
+
+
+def _unauthorized() -> JSONResponse:
+    return JSONResponse({"detail": "Invalid hub callback authentication."}, status_code=401)

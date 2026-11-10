@@ -57,7 +57,9 @@ class VoiceRuntime:
             return BridgeTransport(bridge_ws_url)
         if name == "discord":
             hub_ws_url = settings.hub_url.replace("http://", "ws://").replace("https://", "wss://")
-            return DiscordTransport(self._hub, hub_ws_url, settings.discord_allowed_user_id)
+            return DiscordTransport(
+                self._hub, hub_ws_url, settings.discord_allowed_user_id, settings.hub_token
+            )
         raise VoiceError(f"Unknown voice transport {name!r}. Available: discord, bridge")
 
     # -- introspection ------------------------------------------------------

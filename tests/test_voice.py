@@ -17,6 +17,7 @@ from teaching_agent.voice.pcm import mono_24k_to_stereo_48k, stereo_48k_to_mono_
 ENV = {
     "DISCORD_CHANNEL_ID": "100",
     "DISCORD_ALLOWED_USER_ID": "42",
+    "TEACHING_AGENT_HUB_TOKEN": "test-project-token",
     "TEACHING_AGENT_VOICE_ENABLED": "true",
     "DEEPGRAM_API_KEY": "x",
     "ELEVENLABS_API_KEY": "y",
@@ -191,6 +192,7 @@ def make_conversation(ws_messages, *, ask_pi=None, filler_dir=None):
         speaker_id="42",
         requires_channel=True,
         stream_url=lambda owner: "ws://unused/voice/stream",
+        stream_headers=lambda: {},
         join=AsyncMock(),
         leave=AsyncMock(),
     )
@@ -384,7 +386,9 @@ async def test_ptt_routes_and_auth() -> None:
     from teaching_agent.callback_server import create_callback_app
 
     ptt = RemotePTT()
-    app = create_callback_app(AsyncMock(return_value=None), remote_ptt=ptt, ptt_token="s3cret")
+    app = create_callback_app(
+        AsyncMock(return_value=None), "test-project-token", remote_ptt=ptt, ptt_token="s3cret"
+    )
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as client:
         bad = await client.post("/voice/ptt", json={"state": "down", "token": "wrong"})
         assert bad.status_code == 403 and not ptt.pressed
@@ -405,10 +409,11 @@ from teaching_agent.voice.transport import BridgeTransport, DiscordTransport  # 
 
 async def test_discord_transport_joins_hub_and_targets_learner() -> None:
     hub = AsyncMock()
-    transport = DiscordTransport(hub, "ws://hub:8100", allowed_user_id=42)
+    transport = DiscordTransport(hub, "ws://hub:8100", 42, "test-project-token")
     assert transport.requires_channel
     assert transport.speaker_id == "42"
     assert transport.stream_url("me") == "ws://hub:8100/voice/stream?owner=me"
+    assert transport.stream_headers() == {"Authorization": "Bearer test-project-token"}
     await transport.join(7, "me")
     hub.voice_join.assert_awaited_once_with(7, "me")
     await transport.leave("me")
@@ -533,6 +538,7 @@ def make_sink_conversation(ask_pi):
             speaker_id="42",
             requires_channel=False,
             stream_url=lambda owner: "ws://x",
+            stream_headers=lambda: {},
             join=AsyncMock(),
             leave=AsyncMock(),
         ),
