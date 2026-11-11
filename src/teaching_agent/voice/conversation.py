@@ -213,6 +213,7 @@ class VoiceConversation:
     async def _open_stream(self) -> websockets.ClientConnection:
         return await websockets.connect(
             self._transport.stream_url(self._owner),
+            additional_headers=self._transport.stream_headers(),
             max_size=8 * 1024 * 1024,
         )
 

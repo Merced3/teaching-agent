@@ -17,6 +17,7 @@ from teaching_agent.pi_rpc import PiRunResult
 ENV = {
     "DISCORD_CHANNEL_ID": "100",
     "DISCORD_ALLOWED_USER_ID": "42",
+    "TEACHING_AGENT_HUB_TOKEN": "test-project-token",
     "TEACHING_AGENT_NAME": "Alvar",
     # Isolated session registry: the default path is the real
     # data/session-registry.json, and engine tests must never write to it.

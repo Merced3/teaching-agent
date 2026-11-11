@@ -10,6 +10,7 @@ from teaching_agent.config import ConfigurationError, Settings
 BASE_ENV = {
     "DISCORD_CHANNEL_ID": "1542316428193964032",
     "DISCORD_ALLOWED_USER_ID": "42",
+    "TEACHING_AGENT_HUB_TOKEN": "test-project-token",
 }
 
 
@@ -26,6 +27,18 @@ def test_minimal_env_uses_safe_defaults() -> None:
     assert settings.recall_pings_enabled is False
     assert settings.callback_port == 9200
     assert settings.callback_url == "http://localhost:9200/discord"
+    assert settings.hub_token == "test-project-token"
+
+
+def test_missing_hub_token_fails_closed() -> None:
+    with pytest.raises(ConfigurationError, match="TEACHING_AGENT_HUB_TOKEN"):
+        Settings.from_environment(BASE_ENV | {"TEACHING_AGENT_HUB_TOKEN": " "}, env_file=None)
+
+
+@pytest.mark.parametrize("token", ["", "   "])
+def test_blank_hub_token_is_rejected(token: str) -> None:
+    with pytest.raises(ConfigurationError, match="TEACHING_AGENT_HUB_TOKEN"):
+        make_settings({"TEACHING_AGENT_HUB_TOKEN": token})
 
 
 def test_agent_name_is_configuration() -> None:

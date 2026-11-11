@@ -27,6 +27,7 @@ class Settings:
     discord_channel_id: int
     discord_allowed_user_id: int
     hub_url: str
+    hub_token: str
     callback_host: str
     callback_port: int
     callback_url: str
@@ -96,6 +97,7 @@ class Settings:
         channel_id = _required_positive_int(environment, "DISCORD_CHANNEL_ID")
         user_id = _required_positive_int(environment, "DISCORD_ALLOWED_USER_ID")
         hub_url = environment.get("TEACHING_AGENT_HUB_URL", "http://localhost:8100").strip()
+        hub_token = _required_text(environment, "TEACHING_AGENT_HUB_TOKEN")
         callback_host = environment.get("TEACHING_AGENT_CALLBACK_HOST", "127.0.0.1").strip()
         callback_port = _positive_int_with_default(
             environment, "TEACHING_AGENT_CALLBACK_PORT", default=9200
@@ -276,6 +278,7 @@ class Settings:
             discord_channel_id=channel_id,
             discord_allowed_user_id=user_id,
             hub_url=hub_url,
+            hub_token=hub_token,
             callback_host=callback_host,
             callback_port=callback_port,
             callback_url=callback_url,
@@ -329,6 +332,13 @@ class Settings:
             deepgram_api_key=deepgram_api_key,
             elevenlabs_api_key=elevenlabs_api_key,
         )
+
+
+def _required_text(environment: Mapping[str, str], name: str) -> str:
+    value = environment.get(name, "").strip()
+    if not value:
+        raise ConfigurationError(f"{name} is required.")
+    return value
 
 
 def _required_positive_int(environment: Mapping[str, str], name: str) -> int:

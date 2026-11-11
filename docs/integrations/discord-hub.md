@@ -21,6 +21,18 @@ never need to know what a "session" or a "lesson" is.
 
 ---
 
+## 7. Authenticated cross-host project identity (implemented)
+
+Teaching Agent requires `TEACHING_AGENT_HUB_TOKEN` and sends it as bearer
+authentication on every hub HTTP call and the Discord `/voice/stream`
+handshake (never in the URL). The same credential verifies callback project,
+timestamp, and HMAC-SHA256 over the exact raw body before JSON parsing or
+application dispatch. Missing, forged, tampered, stale, and wrong-project
+callbacks are rejected with 401; `/health` and the existing lecture/PTT routes
+retain their own access behavior. Voice-bridge transport is unchanged.
+
+---
+
 ## 1. Voice foundation (already on the hub roadmap as next-up #2)
 
 - `POST /voice/join` — join a voice channel.
