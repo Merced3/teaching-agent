@@ -181,7 +181,7 @@ class PingController:
 
     def mark_fired(self, when: datetime | None = None) -> None:
         state = self._load()
-        self._save(_State(pings_per_day=state.pings_per_day, last_fired=when or self._now()))
+        self._save(replace(state, last_fired=when or self._now()))
 
     def next_fire(self, now: datetime | None = None) -> datetime | None:
         """Next slot to wait for; None when pings are off."""
@@ -194,6 +194,14 @@ class PingController:
                 return slot
         tomorrow = self.slots_for(now.date() + timedelta(days=1), count)
         return tomorrow[0] if tomorrow else None
+
+    def delay_seconds(self, now: datetime | None = None) -> float | None:
+        """Delay to the next slot using the same learner wall clock as the slots."""
+        now = now or self._now()
+        nxt = self.next_fire(now)
+        if nxt is None:
+            return None
+        return max(1.0, (nxt - now).total_seconds())
 
     def describe(self, now: datetime | None = None) -> str:
         now = now or self._now()

@@ -103,18 +103,24 @@ async def agent_service(ctx: ServiceContext) -> None:
         # The wait is capped so a live /pings change lands within minutes
         # even when the next slot is hours away.
         while not ctx.stop_event.is_set():
-            delay = engine.ping_delay_seconds()
-            delay = 300.0 if delay is None else min(delay, 300.0)
-            with suppress(TimeoutError):
-                await asyncio.wait_for(ctx.stop_event.wait(), timeout=delay)
-            if ctx.stop_event.is_set():
-                break
-            if not engine.ping_due():
-                continue
             try:
+                delay = engine.ping_delay_seconds()
+                delay = 300.0 if delay is None else min(delay, 300.0)
+                with suppress(TimeoutError):
+                    await asyncio.wait_for(ctx.stop_event.wait(), timeout=delay)
+                if ctx.stop_event.is_set():
+                    break
+                if not engine.ping_due():
+                    continue
+                logger.info("Ping slot due; starting recall tick.")
                 await engine.recall_tick()
             except Exception:
-                logger.exception("Recall tick failed; will retry next wake.")
+                # Includes state-store failures in delay/due evaluation, not only
+                # model/delivery failures. Keep this nested task alive independently
+                # of the healthy callback server, with a bounded failure backoff.
+                logger.exception("Recall loop iteration failed; will retry in 30 seconds.")
+                with suppress(TimeoutError):
+                    await asyncio.wait_for(ctx.stop_event.wait(), timeout=30.0)
 
     async def shutdown_when_asked() -> None:
         await ctx.stop_event.wait()

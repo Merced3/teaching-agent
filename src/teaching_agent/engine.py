@@ -15,7 +15,7 @@ import asyncio
 import logging
 import re
 from contextlib import suppress
-from datetime import date, datetime
+from datetime import date
 from typing import Any
 from uuid import uuid4
 
@@ -170,17 +170,19 @@ _COMMAND_PROMPTS = {
 }
 
 _RECALL_TICK_PROMPT = (
-    "This is an unprompted ping, not a learner message. The [date:] prefix is the "
-    "real current date — compute elapsed time from it. Read docs/goal.md, "
+    "This is an unprompted ping, not a learner message. This configured slot MUST "
+    "produce ONE visible pedagogical ping; never reply SILENT. The [date:] prefix "
+    "is the real current date — compute elapsed time from it. Read docs/goal.md, "
     "docs/routing.md, docs/current-state.md, and the relevant session logs, then "
     "decide by routing priority: (1) if any recall checks are due or overdue, ask "
     "ONE of them now, plainly, one new word per sentence; (2) else if a `known` "
     "node's evidence is old, re-verify it with ONE fresh question; (3) else make "
     "ONE one-line lesson offer at the current edge ('want a lesson on X? reply "
-    "yes') — never TEACH unprompted, teaching starts on the learner's reply. "
-    "Never ping just to engage; every ping is recall, re-verification, or an "
-    "offer. Keep the whole message under 4 sentences. If there is genuinely "
-    "nothing to ask, re-verify, or offer, reply with exactly: SILENT"
+    "yes') — never TEACH unprompted, teaching starts on the learner's reply. If "
+    "one question is still outstanding, briefly re-ask THAT SAME question instead "
+    "of stacking a new one. Recent conversation or fatigue does not make this slot "
+    "silent; choose one short, low-cost ask. Never ping just to engage; every ping "
+    "is recall, re-verification, or an offer. Keep the whole message under 4 sentences."
 )
 
 _LECTURE_WRITE_PROMPT = (
@@ -1008,15 +1010,18 @@ class TeachingEngine:
             logger.debug("Transcript post failed; continuing.", exc_info=True)
 
     async def recall_tick(self) -> None:
-        """Scheduled job: let Pi decide whether a recall check is due. The
-        slot counts as consumed even when pi stays SILENT — an un-fired
-        slot must not turn into a retry-every-minute nag."""
+        """Run one scheduled slot; consume it only after required delivery succeeds."""
         if not self._settings.recall_pings_enabled:
             return
         reply = await self._ask_pi(self._settings.discord_channel_id, _RECALL_TICK_PROMPT)
-        self._pings.mark_fired()
         if reply and not reply.strip().upper().startswith(_SILENT):
             await self._hub.post_message(self._settings.discord_channel_id, reply)
+            logger.info("Ping slot delivered to Discord.")
+        else:
+            # Defensive logging: the visible-ping prompt no longer permits this,
+            # but a model contract violation must not look like a dead scheduler.
+            logger.warning("Ping slot returned SILENT despite the visible-ping policy.")
+        self._pings.mark_fired()
 
     def ping_due(self) -> bool:
         """A scheduled slot has passed and not been fired (main loop's gate)."""
@@ -1024,10 +1029,7 @@ class TeachingEngine:
 
     def ping_delay_seconds(self) -> float | None:
         """Seconds until the next slot; None when pings are off (loop re-checks)."""
-        nxt = self._pings.next_fire()
-        if nxt is None:
-            return None
-        return max(1.0, (nxt - datetime.now()).total_seconds())
+        return self._pings.delay_seconds()
 
     async def _handle_pings(self, payload: dict[str, Any]) -> None:
         """Live-tune unprompted pings per day — code-owned like /mode."""

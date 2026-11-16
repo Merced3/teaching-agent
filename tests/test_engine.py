@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock
 
+import pytest
+
 from teaching_agent.config import Settings
 from teaching_agent.engine import TeachingEngine
 from teaching_agent.pi_rpc import PiRunResult
@@ -110,6 +112,18 @@ async def test_recall_tick_silent_means_no_message() -> None:
     engine._settings = settings  # noqa: SLF001 — test-only toggle
     await engine.recall_tick()
     hub.post_message.assert_not_awaited()
+
+
+async def test_recall_tick_delivery_failure_leaves_slot_unfired() -> None:
+    engine, hub, pi = await _started()
+    engine._settings = Settings.from_environment(  # noqa: SLF001 — test-only toggle
+        {**ENV, "TEACHING_AGENT_RECALL_PINGS_ENABLED": "true"}, env_file=None
+    )
+    before = engine._pings._load().last_fired  # noqa: SLF001
+    hub.post_message.side_effect = RuntimeError("delivery failed")
+    with pytest.raises(RuntimeError, match="delivery failed"):
+        await engine.recall_tick()
+    assert engine._pings._load().last_fired == before  # noqa: SLF001
 
 
 async def _started() -> tuple[TeachingEngine, AsyncMock, AsyncMock]:
