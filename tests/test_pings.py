@@ -74,6 +74,24 @@ def test_mark_fired_clears_due(tmp_path: Path) -> None:
     assert ctl.due(now=first + timedelta(minutes=2)) is False
 
 
+def test_mark_fired_preserves_window_and_daily_schedule(tmp_path: Path) -> None:
+    ctl = make_controller(tmp_path, window_start_hour=8, window_end_hour=22)
+    ctl.set_window(8, 23)
+    before = ctl.slots_for(DAY, 3)
+    ctl.mark_fired(before[0] + timedelta(minutes=1))
+    assert ctl.window() == (8, 23)
+    assert ctl.slots_for(DAY, 3) == before
+
+
+def test_delay_seconds_uses_the_same_learner_wall_clock(tmp_path: Path) -> None:
+    ctl = make_controller(tmp_path)
+    first = ctl.slots_for(DAY, 3)[0]
+    now = first - timedelta(seconds=90)
+    assert ctl.delay_seconds(now) == 90
+    ctl.set_count(0)
+    assert ctl.delay_seconds(now) is None
+
+
 def test_missed_slots_collapse_to_one_ping(tmp_path: Path) -> None:
     """After downtime (all slots missed), due fires once, not once per slot."""
     ctl = make_controller(tmp_path, window_start_hour=8, window_end_hour=23)
