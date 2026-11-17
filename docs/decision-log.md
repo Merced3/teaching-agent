@@ -802,6 +802,13 @@ Verdict: keep, pending migration counts/checksums and one real ping + `/close`. 
 
 OUTCOME (2026-11-08): LIVE COMPLETE. The initial 196 events + 26 nodes imported with a byte-identical export (`d9500fc3f5f6fa92bc75ac77e7de05db6f5cc5ac772989ecee324d4b58cf4797`). Real learner interaction then appended events 197–198 through `kb_append.py`; full chain verification passes at 198, and the real six-turn `/close` completed/rotated correctly. The 198-event export (`d06381033f6e2a5e99c9f6cb2209827b2558e47512d7fab10ddbd3a027a1ca4b`) committed/pushed through the nightly path. Pings + 16 source session records copied to `teaching`; 305 harness runs merged with source provenance into `harness_teaching`; the only generated asset (a zero-byte failed MP3) verified in R2. All 119 offline tests + 2 isolated managed-Postgres integration tests pass. App deployed at `88e11a015ee052e4873d679afb689da7b852b1b9`, healthy, no live errors. Sources retained; deletion gate remains pending a subsequent nightly managed backup + encrypted R2 restore drill and explicit owner approval.
 
+## 2026-11-15 — Unanswered ping questions get ONE re-surface after ~48h (supersedes pure silence)
+
+Hypothesis: The one-question-at-a-time cadence finding (learner.md, 2026-10-10..13) was being applied as indefinite SILENT while a question stood unanswered. But the learner self-reports pings are now a REQUIREMENT ('I don't learn on my own accord without them', 2026-11-13), so a silent stretch is lost learning, not politeness. A single re-surface of the outstanding question after ~48h is pedagogical, not engagement-bait or stacking.
+
+Evidence: 2026-11-10 keyed-receipt cold re-check asked once, then six consecutive ping slots (11-10..14) went SILENT awaiting a reply; learner surfaced 11-13 asking 'where have the pings been?' and stated the pings-as-requirement position. Re-asked 11-15 after the agreed ~48h gap; learner answered within the day and completed the coached rebuild.
+
+Verdict: adopt. Policy: one outstanding question at a time, unchanged; but if unanswered ~48h, re-surface it ONCE, plainly; then quiet again until the learner replies or overrides. Agreed with the learner in chat 2026-11-13. Recorded in docs/learner.md (pings-are-load-bearing row).
 ## 2026-11-16 — Configured ping slots are visible, and a tick preserves the schedule
 
 Hypothesis: `/pings N` should mean N visible pedagogical messages per day; slot execution must preserve the learner's count/window and remain retryable across transient scheduler/store/delivery failures.
