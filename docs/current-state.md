@@ -24,7 +24,7 @@
 
 ### sd/invariant
 > Can state the rule a system's state must always satisfy, distinct from the mechanisms (atomicity, guarded writes) that guard it.
-- level: recalled (unaided); unaided: recalled; retention win; events: 9; last: 2026-11-08T23:24:28Z
+- level: recalled (unaided); unaided: recalled; retention win; events: 12; last: 2026-11-16T00:00:00Z
 
 ### sd/jitter
 > Can explain how randomizing retry timing breaks lockstep so a retrying crowd does not arrive in waves.
@@ -32,7 +32,7 @@
 
 ### sd/keyed-receipt
 > Can design a retry-safe operation: receipt written before the send, retry reads the receipt and returns the recorded result instead of re-executing.
-- level: transferred (unaided); unaided: transferred; retention win; events: 31; last: 2026-11-06T00:00:00Z
+- level: transferred (unaided); unaided: transferred; retention win; events: 37; last: 2026-11-16T00:00:00Z
 
 ### sd/purpose-of-tests
 > Can state what tests buy: regression detection and authorization of output (incl. AI output), not proof of correctness.
@@ -52,8 +52,8 @@
 
 ### sd/timeout-unknown-state
 > After an outside call times out, can enumerate executed/pending/failed, refuse blind retry, and reset to a known state (stay PENDING + provider query).
-- level: applied (unaided); unaided: applied; retention win; events: 13; last: 2026-11-08T22:05:00Z
+- level: applied (unaided); unaided: applied; retention win; events: 15; last: 2026-11-16T00:00:00Z
 
 ### sd/write-boundary
 > Can identify the perimeter of state-changing code paths and knows invariants must be enforced on every write path.
-- level: recalled (unaided); unaided: recalled; retention win; events: 7; last: 2026-10-23T00:00:00Z
+- level: recalled (unaided); unaided: recalled; retention win; events: 8; last: 2026-11-09T05:44:29Z
