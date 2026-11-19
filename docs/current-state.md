@@ -24,11 +24,11 @@
 
 ### sd/invariant
 > Can state the rule a system's state must always satisfy, distinct from the mechanisms (atomicity, guarded writes) that guard it.
-- level: recalled (unaided); unaided: recalled; retention win; events: 12; last: 2026-11-16T00:00:00Z
+- level: explained (coached); unaided: recalled; retention win; events: 15; last: 2026-11-18T17:58:06Z
 
 ### sd/jitter
 > Can explain how randomizing retry timing breaks lockstep so a retrying crowd does not arrive in waves.
-- level: explained (coached); unaided: recalled; retention win; events: 6; last: 2026-10-24T00:00:00Z
+- level: explained (coached); unaided: recalled; retention win; events: 7; last: 2026-11-18T00:00:00Z
 
 ### sd/keyed-receipt
 > Can design a retry-safe operation: receipt written before the send, retry reads the receipt and returns the recorded result instead of re-executing.
@@ -44,7 +44,7 @@
 
 ### sd/state-machine
 > Can model a lifecycle as named states + allowed transitions, using a middle state (e.g. CLOSING) as a witness to where a crash happened.
-- level: explained (unaided); unaided: explained; retention win; events: 9; last: 2026-11-06T00:00:00Z
+- level: explained (unaided); unaided: explained; retention win; events: 10; last: 2026-11-18T17:58:06Z
 
 ### sd/thundering-herd
 > Can recognize that a mass of simultaneous valid retries can re-crash a recovering provider.
@@ -56,4 +56,4 @@
 
 ### sd/write-boundary
 > Can identify the perimeter of state-changing code paths and knows invariants must be enforced on every write path.
-- level: recalled (unaided); unaided: recalled; retention win; events: 8; last: 2026-11-09T05:44:29Z
+- level: recalled (unaided); unaided: recalled; retention win; events: 9; last: 2026-11-18T17:58:06Z
