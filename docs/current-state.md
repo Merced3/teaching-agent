@@ -8,11 +8,11 @@
 
 ### sd/atomicity
 > Can identify which writes belong in one atomic unit (all-or-nothing, rollback) and place the boundary relative to the point of no return.
-- level: explained (unaided); unaided: explained; retention win; events: 9; last: 2026-10-26T00:00:00Z
+- level: explained (unaided); unaided: explained; retention win; events: 10; last: 2026-11-19T00:00:00Z
 
 ### sd/backoff
 > Can explain multiplicative wait between retries and why it protects a recovering dependency.
-- level: transferred (unaided); unaided: transferred; retention win; events: 10; last: 2026-10-30T00:00:00Z
+- level: transferred (unaided); unaided: transferred; retention win; events: 11; last: 2026-11-19T00:00:00Z
 
 ### sd/crash-window
 > Can locate the crash window - the gap between two durable steps where a crash forces a duplication-vs-loss choice - and pick the acceptable failure mode.
@@ -20,11 +20,11 @@
 
 ### sd/idempotency
 > Can distinguish idempotency (same effect regardless of run count) from retry-safety (caller may retry blindly and still learn the result).
-- level: explained (unaided); unaided: explained; retention win; events: 11; last: 2026-10-28T00:00:00Z
+- level: explained (coached); unaided: explained; retention win; events: 13; last: 2026-11-19T00:00:00Z
 
 ### sd/invariant
 > Can state the rule a system's state must always satisfy, distinct from the mechanisms (atomicity, guarded writes) that guard it.
-- level: explained (coached); unaided: recalled; retention win; events: 15; last: 2026-11-18T17:58:06Z
+- level: explained (coached); unaided: recalled; retention win; events: 16; last: 2026-11-20T00:00:00Z
 
 ### sd/jitter
 > Can explain how randomizing retry timing breaks lockstep so a retrying crowd does not arrive in waves.
