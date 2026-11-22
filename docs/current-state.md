@@ -20,7 +20,7 @@
 
 ### sd/idempotency
 > Can distinguish idempotency (same effect regardless of run count) from retry-safety (caller may retry blindly and still learn the result).
-- level: explained (coached); unaided: explained; retention win; events: 13; last: 2026-11-19T00:00:00Z
+- level: explained (unaided); unaided: explained; retention win; events: 14; last: 2026-11-22T00:00:00Z
 
 ### sd/invariant
 > Can state the rule a system's state must always satisfy, distinct from the mechanisms (atomicity, guarded writes) that guard it.
@@ -32,11 +32,11 @@
 
 ### sd/keyed-receipt
 > Can design a retry-safe operation: receipt written before the send, retry reads the receipt and returns the recorded result instead of re-executing.
-- level: transferred (unaided); unaided: transferred; retention win; events: 37; last: 2026-11-16T00:00:00Z
+- level: transferred (unaided); unaided: transferred; retention win; events: 38; last: 2026-11-22T00:00:00Z
 
 ### sd/purpose-of-tests
 > Can state what tests buy: regression detection and authorization of output (incl. AI output), not proof of correctness.
-- level: explained (unaided); unaided: explained; no delayed evidence; events: 3; last: 2026-11-06T00:00:00Z
+- level: explained (unaided); unaided: explained; retention win; events: 4; last: 2026-11-21T00:00:00Z
 
 ### sd/reconciliation-job
 > Can design a bounded background job that resolves unknown outcomes via provider query by request ID, escalating to a human when pending too long.
