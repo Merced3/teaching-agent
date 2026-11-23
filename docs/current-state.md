@@ -28,7 +28,7 @@
 
 ### sd/jitter
 > Can explain how randomizing retry timing breaks lockstep so a retrying crowd does not arrive in waves.
-- level: explained (coached); unaided: recalled; retention win; events: 7; last: 2026-11-18T00:00:00Z
+- level: explained (unaided); unaided: explained; retention win; events: 8; last: 2026-11-23T00:00:00Z
 
 ### sd/keyed-receipt
 > Can design a retry-safe operation: receipt written before the send, retry reads the receipt and returns the recorded result instead of re-executing.
@@ -52,7 +52,7 @@
 
 ### sd/timeout-unknown-state
 > After an outside call times out, can enumerate executed/pending/failed, refuse blind retry, and reset to a known state (stay PENDING + provider query).
-- level: applied (unaided); unaided: applied; retention win; events: 15; last: 2026-11-16T00:00:00Z
+- level: applied (unaided); unaided: applied; retention win; events: 16; last: 2026-11-22T00:00:00Z
 
 ### sd/write-boundary
 > Can identify the perimeter of state-changing code paths and knows invariants must be enforced on every write path.
