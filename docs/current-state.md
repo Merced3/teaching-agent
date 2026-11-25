@@ -8,7 +8,7 @@
 
 ### sd/atomicity
 > Can identify which writes belong in one atomic unit (all-or-nothing, rollback) and place the boundary relative to the point of no return.
-- level: explained (unaided); unaided: explained; retention win; events: 10; last: 2026-11-19T00:00:00Z
+- level: explained (unaided); unaided: explained; retention win; events: 11; last: 2026-11-24T00:00:00Z
 
 ### sd/backoff
 > Can explain multiplicative wait between retries and why it protects a recovering dependency.
