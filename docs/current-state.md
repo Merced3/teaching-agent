@@ -12,7 +12,7 @@
 
 ### sd/backoff
 > Can explain multiplicative wait between retries and why it protects a recovering dependency.
-- level: transferred (unaided); unaided: transferred; retention win; events: 11; last: 2026-11-19T00:00:00Z
+- level: transferred (unaided); unaided: transferred; retention win; events: 12; last: 2026-11-25T00:00:00Z
 
 ### sd/crash-window
 > Can locate the crash window - the gap between two durable steps where a crash forces a duplication-vs-loss choice - and pick the acceptable failure mode.
@@ -24,7 +24,7 @@
 
 ### sd/invariant
 > Can state the rule a system's state must always satisfy, distinct from the mechanisms (atomicity, guarded writes) that guard it.
-- level: explained (coached); unaided: recalled; retention win; events: 16; last: 2026-11-20T00:00:00Z
+- level: explained (coached); unaided: recalled; retention win; events: 17; last: 2026-11-25T00:00:00Z
 
 ### sd/jitter
 > Can explain how randomizing retry timing breaks lockstep so a retrying crowd does not arrive in waves.
