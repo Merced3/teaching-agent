@@ -12,7 +12,7 @@
 
 ### sd/backoff
 > Can explain multiplicative wait between retries and why it protects a recovering dependency.
-- level: transferred (unaided); unaided: transferred; retention win; events: 12; last: 2026-11-25T00:00:00Z
+- level: transferred (unaided); unaided: transferred; retention win; events: 13; last: 2026-11-26T00:00:00Z
 
 ### sd/crash-window
 > Can locate the crash window - the gap between two durable steps where a crash forces a duplication-vs-loss choice - and pick the acceptable failure mode.
@@ -24,11 +24,11 @@
 
 ### sd/invariant
 > Can state the rule a system's state must always satisfy, distinct from the mechanisms (atomicity, guarded writes) that guard it.
-- level: explained (coached); unaided: recalled; retention win; events: 17; last: 2026-11-25T00:00:00Z
+- level: transferred (unaided); unaided: transferred; retention win; events: 18; last: 2026-11-26T00:00:00Z
 
 ### sd/jitter
 > Can explain how randomizing retry timing breaks lockstep so a retrying crowd does not arrive in waves.
-- level: explained (unaided); unaided: explained; retention win; events: 8; last: 2026-11-23T00:00:00Z
+- level: explained (unaided); unaided: explained; retention win; events: 9; last: 2026-11-26T00:00:00Z
 
 ### sd/keyed-receipt
 > Can design a retry-safe operation: receipt written before the send, retry reads the receipt and returns the recorded result instead of re-executing.
@@ -44,11 +44,11 @@
 
 ### sd/state-machine
 > Can model a lifecycle as named states + allowed transitions, using a middle state (e.g. CLOSING) as a witness to where a crash happened.
-- level: explained (unaided); unaided: explained; retention win; events: 11; last: 2026-11-23T00:00:00Z
+- level: applied (unaided); unaided: applied; retention win; events: 12; last: 2026-11-26T00:00:00Z
 
 ### sd/thundering-herd
 > Can recognize that a mass of simultaneous valid retries can re-crash a recovering provider.
-- level: explained (unaided); unaided: explained; retention win; events: 4; last: 2026-11-20T00:00:00Z
+- level: explained (unaided); unaided: explained; retention win; events: 5; last: 2026-11-26T00:00:00Z
 
 ### sd/timeout-unknown-state
 > After an outside call times out, can enumerate executed/pending/failed, refuse blind retry, and reset to a known state (stay PENDING + provider query).
