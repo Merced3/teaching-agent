@@ -1,6 +1,6 @@
 # NEXT-BOOT (consume once, then rename)
-- Date written: 2026-11-26. Model: Claude.
-- Learner state: sd/invariant transferred unaided (invented own invariant for Socrates /ask-now: never leaves OPEN without checkpoint on disk); sd/state-machine applied spontaneously. Both logged 11-26. Prior boot note consumed (rename blocked by shell; overwritten).
-- Owed recall: sd/purpose-of-tests due ~2026-11-28. Then sd/thundering-herd (last 11-20, oldest remaining).
-- Active thread: none. Learner is mid-project (publishing a project to a VPS, inter-project communication issues) — real-world friction is high; keep pings low-cost, anchoring to that project is welcome (H8).
-- Next node per routing: sd/purpose-of-tests (rule 1 — owed recall due 11-28) or sd/thundering-herd (rule 2 — oldest evidence).
+- Date written: 2026-11-27. Model: Claude.
+- Learner state: sd/purpose-of-tests explained unaided at 6d (own framing: tests freeze world-assumptions; missed authorization-of-output half, supplied). Map all ≤6d fresh. Retention streak continues — everything is winning at 5-15d delays.
+- Owed recall: none imminent. Oldest evidence: sd/crash-window and sd/reconciliation-job (both 11-21) — re-verify ~11-28/29. Then sd/keyed-receipt + sd/idempotency + sd/timeout-unknown-state (11-22).
+- Active thread: none. Learner mid VPS-deploy project; keep pings low-cost, anchor to project when natural.
+- Next node per routing: sd/crash-window (rule 2 — oldest evidence) around 11-28.

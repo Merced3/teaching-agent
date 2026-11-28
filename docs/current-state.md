@@ -36,7 +36,7 @@
 
 ### sd/purpose-of-tests
 > Can state what tests buy: regression detection and authorization of output (incl. AI output), not proof of correctness.
-- level: explained (unaided); unaided: explained; retention win; events: 4; last: 2026-11-21T00:00:00Z
+- level: explained (unaided); unaided: explained; retention win; events: 5; last: 2026-11-27T00:00:00Z
 
 ### sd/reconciliation-job
 > Can design a bounded background job that resolves unknown outcomes via provider query by request ID, escalating to a human when pending too long.
